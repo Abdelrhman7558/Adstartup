@@ -1,0 +1,499 @@
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase, Profile, Subscription, Brief, UserState, MetaConnection } from '../lib/supabase';
+import { PRODUCTION_DOMAIN } from '../lib/domainValidation';
+
+interface AuthContextType {
+  user: User | null;
+  profile: Profile | null;
+  subscription: Subscription | null;
+  brief: Brief | null;
+  userState: UserState | null;
+  metaConnection: MetaConnection | null;
+  session: Session | null;
+  loading: boolean;
+  isSubscribed: boolean;
+  hasBrief: boolean;
+  isMetaConnected: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signInWithGoogle: () => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, phoneNumber: string, country: string) => Promise<{ error: Error | null; data?: any }>;
+  signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: Error | null }>;
+  refreshUserState: () => Promise<void>;
+  refreshSubscription: () => Promise<void>;
+  refreshBrief: () => Promise<void>;
+  refreshMetaConnection: () => Promise<void>;
+  countryCode?: string;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [brief, setBrief] = useState<Brief | null>(null);
+  const [userState, setUserState] = useState<UserState | null>(null);
+  const [metaConnection, setMetaConnection] = useState<MetaConnection | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [hasBrief, setHasBrief] = useState(false);
+  const [isMetaConnected, setIsMetaConnected] = useState(false);
+  const [countryCode, setCountryCode] = useState('US');
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        loadUserData(session.user.id);
+        const userCountry = session.user.user_metadata?.country || 'US';
+        setCountryCode(userCountry);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        const userCountry = session.user.user_metadata?.country || 'US';
+        setCountryCode(userCountry);
+
+        // Handle OAuth sign-in/sign-up webhooks
+        if (event === 'SIGNED_IN' && session.user.app_metadata?.provider === 'google') {
+          try {
+            await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/Sign-in', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                event: 'user_signed_in',
+                user_id: session.user.id,
+                email: session.user.email,
+                provider: 'google',
+                timestamp: new Date().toISOString(),
+              }),
+            });
+          } catch (webhookError) {
+            console.error('[Google SignIn] Webhook error:', webhookError);
+          }
+        }
+
+        loadUserData(session.user.id);
+      } else {
+        setProfile(null);
+        setSubscription(null);
+        setBrief(null);
+        setUserState(null);
+        setMetaConnection(null);
+        setIsSubscribed(false);
+        setHasBrief(false);
+        setIsMetaConnected(false);
+        setCountryCode('US');
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const loadUserData = async (userId: string) => {
+    try {
+      await Promise.all([
+        loadProfile(userId),
+        loadUserState(userId),
+        loadSubscription(userId),
+        loadBrief(userId),
+        loadMetaConnection(userId),
+      ]);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      setProfile(data);
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
+
+  const loadUserState = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_states')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      setUserState(data);
+    } catch (error) {
+      console.error('Error loading user state:', error);
+    }
+  };
+
+  const loadSubscription = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('trial_start_at, trial_end_at, trial_expired')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (userError && userError.code !== 'PGRST116') throw userError;
+
+      const hasActiveTrial = userData &&
+        userData.trial_end_at &&
+        !userData.trial_expired &&
+        new Date(userData.trial_end_at) > new Date();
+
+      setSubscription(data);
+      setIsSubscribed(!!data || !!hasActiveTrial);
+    } catch (error) {
+      console.error('Error loading subscription:', error);
+      setIsSubscribed(false);
+    }
+  };
+
+  const loadBrief = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('campaign_briefs')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      setBrief(data);
+      setHasBrief(!!data);
+    } catch (error) {
+      console.error('Error loading brief:', error);
+      setHasBrief(false);
+    }
+  };
+
+  const loadMetaConnection = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('meta_connections')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      setMetaConnection(data);
+      setIsMetaConnected(data?.is_connected ?? false);
+    } catch (error) {
+      console.error('Error loading meta connection:', error);
+      setIsMetaConnected(false);
+    }
+  };
+
+  const refreshUserState = async () => {
+    if (user) await loadUserState(user.id);
+  };
+
+  const refreshSubscription = async () => {
+    if (user) await loadSubscription(user.id);
+  };
+
+  const refreshBrief = async () => {
+    if (user) await loadBrief(user.id);
+  };
+
+  const refreshMetaConnection = async () => {
+    if (user) await loadMetaConnection(user.id);
+  };
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('verified')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        if (userData && !userData.verified) {
+          await supabase.auth.signOut();
+          throw new Error('Your email is not verified. Please check your inbox and click the verification link.');
+        }
+
+        if (!data.user.email_confirmed_at) {
+          await supabase.auth.signOut();
+          throw new Error('Your email is not confirmed. Please check your inbox and click the confirmation link.');
+        }
+      }
+
+      try {
+        await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/Sign-in', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'user_signed_in',
+            user_id: data.user.id,
+            email: data.user.email,
+            timestamp: new Date().toISOString(),
+          }),
+        });
+      } catch (webhookError) {
+        console.error('[SignIn] Webhook error:', webhookError);
+      }
+
+      console.log('[SignIn] Success - email confirmed at:', data.user?.email_confirmed_at);
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    try {
+      const redirectTo = `${PRODUCTION_DOMAIN}/auth/confirm`;
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+        },
+      });
+
+      if (error) throw error;
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  const signUp = async (email: string, password: string, fullName: string, phoneNumber: string, country: string) => {
+    try {
+      console.log('[SignUp] Starting signup process');
+      console.log('[SignUp] Input validation:', {
+        email: !!email,
+        password: !!password,
+        fullName: !!fullName,
+        phoneNumber: !!phoneNumber,
+        country: !!country
+      });
+
+      const emailRedirectTo = `${PRODUCTION_DOMAIN}/auth/confirm`;
+
+      console.log('[SignUp] Step 1: Creating Supabase Auth user...');
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo,
+          data: {
+            full_name: fullName || 'User',
+            phone_number: phoneNumber || '',
+            country: country || 'US', // Store country code
+          },
+        },
+      });
+
+      if (signUpError) { return { error: signUpError, data: null }; }
+
+      if (!authData.user) {
+        throw new Error('Signup failed - no user returned from auth');
+      }
+
+      const userId = authData.user.id;
+      console.log('[SignUp] Step 1: SUCCESS - Auth user created:', userId);
+      console.log('[SignUp] Step 2: Trigger will auto-create user record (verified=false)...');
+
+      // Wait a bit for trigger to execute
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Verify user was created by trigger (non-critical)
+      console.log('[SignUp] Step 3: Verifying database user creation...');
+      try {
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('id, email, verified')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (dbUser) {
+          console.log('[SignUp] Step 3: SUCCESS - User found in database:', {
+            id: dbUser.id,
+            email: dbUser.email,
+            verified: dbUser.verified,
+          });
+        } else {
+          console.warn('[SignUp] Step 3: WARNING - User not yet in database (trigger still executing)');
+        }
+      } catch (checkError) {
+        console.warn('[SignUp] Step 3: WARNING - Could not verify user in database (non-critical):', checkError);
+      }
+
+      // Create profile (non-critical)
+      console.log('[SignUp] Step 4: Creating profile...');
+      try {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (!existingProfile) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: userId,
+              full_name: fullName || 'User',
+              phone_number: phoneNumber || '',
+            });
+
+          if (profileError) {
+            if (profileError.code === '23505') {
+              console.log('[SignUp] Step 4: Profile already exists - skipping');
+            } else {
+              console.warn('[SignUp] Step 4: Profile creation warning (non-critical):', {
+                code: profileError.code,
+                message: profileError.message,
+              });
+            }
+          } else {
+            console.log('[SignUp] Step 4: Profile created successfully');
+          }
+        } else {
+          console.log('[SignUp] Step 4: Profile already exists - skipping');
+        }
+      } catch (profileCheckError) {
+        console.warn('[SignUp] Step 4: WARNING - Could not manage profile (non-critical):', profileCheckError);
+      }
+
+      // Send webhook notification (non-critical)
+      console.log('[SignUp] Step 5: Sending webhook notification...');
+      try {
+        const webhookResponse = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/Sign-up', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'user_signed_up',
+            user_id: userId,
+            email,
+            fullName: fullName || 'User',
+            phoneNumber: phoneNumber || '',
+            country: country || 'US',
+            timestamp: new Date().toISOString(),
+          }),
+        });
+
+        if (webhookResponse.ok) {
+          console.log('[SignUp] Step 5: Webhook sent successfully');
+        } else {
+          console.warn('[SignUp] Step 5: Webhook returned non-200 status:', webhookResponse.status);
+        }
+      } catch (webhookError) {
+        console.warn('[SignUp] Step 5: Webhook error (non-critical):', webhookError);
+      }
+
+      console.log('[SignUp] COMPLETE: Signup successful');
+      console.log('[SignUp] IMPORTANT: Verification email sent - user must verify email to sign in');
+
+      return { error: null, data: authData };
+    } catch (error: any) {
+      console.error('[SignUp] FAILED: Signup process failed', {
+        errorType: error?.name,
+        errorCode: error?.code,
+        errorMessage: error?.message,
+        fullError: error,
+      });
+
+      return { error: error as Error, data: null };
+    }
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      const redirectTo = `${PRODUCTION_DOMAIN}/reset-password`;
+
+      console.log('[ResetPassword] ✓ Using redirect URL:', redirectTo);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo,
+      });
+
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  const value = {
+    user,
+    profile,
+    subscription,
+    brief,
+    userState,
+    metaConnection,
+    session,
+    loading,
+    isSubscribed,
+    hasBrief,
+    isMetaConnected,
+    countryCode, // Expose country code
+    signIn,
+    signInWithGoogle,
+    signUp,
+    signOut,
+    resetPassword,
+    refreshUserState,
+    refreshSubscription,
+    refreshBrief,
+    refreshMetaConnection,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
