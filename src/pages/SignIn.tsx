@@ -115,7 +115,7 @@ export default function SignIn() {
             transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-20 h-20 flex items-center justify-center">
+              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
                 <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-contain" />
               </div>
               <div className="text-6xl font-bold text-red-600">The Ad Agent</div>
@@ -148,7 +148,7 @@ export default function SignIn() {
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
             <div className="flex flex-col items-center mb-4">
-              <div className="w-16 h-16 flex items-center justify-center mb-2">
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-2">
                 <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-contain" />
               </div>
               <div className="text-4xl font-bold text-red-600">The Ad Agent</div>

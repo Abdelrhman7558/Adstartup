@@ -96,9 +96,7 @@ export default function Header() {
     return (
       <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-6">
         <div className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white">
-          <div className="w-8 h-8 flex items-center justify-center">
-            <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-contain" />
-          </div>
+          <img src={logoNew} alt="The Ad Agent Logo" className="h-10 w-auto object-contain" />
           <span>The Ad Agent</span>
         </div>
       </header>
@@ -108,9 +106,7 @@ export default function Header() {
   return (
     <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-6 sticky top-0 z-40">
       <Link to="/" className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white hover:opacity-80 transition-opacity">
-        <div className="w-8 h-8 flex items-center justify-center">
-          <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-contain" />
-        </div>
+        <img src={logoNew} alt="The Ad Agent Logo" className="h-10 w-auto object-contain" />
         <span>The Ad Agent</span>
       </Link>
 
