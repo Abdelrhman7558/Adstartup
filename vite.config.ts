@@ -5,5 +5,6 @@ export default defineConfig({
   plugins: [react()],
   build: {
     chunkSizeWarningLimit: 2000
-  }
+  },
+  base: process.env.VITE_BASE_PATH || "/Adstartup"
 })
