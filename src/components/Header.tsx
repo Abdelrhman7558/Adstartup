@@ -5,6 +5,7 @@ import { LogOut, Settings, Home, Copy, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { hasActiveSubscription } from '../lib/subscriptionService';
 import { trialService } from '../lib/trialService';
+import logoNew from '../assets/logo-new.png';
 
 export default function Header() {
   const navigate = useNavigate();
@@ -94,15 +95,23 @@ export default function Header() {
   if (loading) {
     return (
       <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-6">
-        <div className="text-lg font-bold text-gray-900 dark:text-white">The Ad Agent</div>
+        <div className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white">
+          <div className="w-8 h-8 flex items-center justify-center">
+            <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-contain" />
+          </div>
+          <span>The Ad Agent</span>
+        </div>
       </header>
     );
   }
 
   return (
     <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-6 sticky top-0 z-40">
-      <Link to="/" className="text-lg font-bold text-gray-900 dark:text-white hover:opacity-80 transition-opacity">
-        The Ad Agent
+      <Link to="/" className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white hover:opacity-80 transition-opacity">
+        <div className="w-8 h-8 flex items-center justify-center">
+          <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-contain" />
+        </div>
+        <span>The Ad Agent</span>
       </Link>
 
       <nav className="flex items-center gap-4">

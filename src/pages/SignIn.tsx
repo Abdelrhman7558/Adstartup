@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, Mail } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import logoNew from '../assets/logo-new.png';
 
 export default function SignIn() {
   const navigate = useNavigate();
@@ -113,7 +114,12 @@ export default function SignIn() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="text-6xl font-bold text-red-600 mb-6">The Ad Agent</div>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-20 h-20 flex items-center justify-center">
+                <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-contain" />
+              </div>
+              <div className="text-6xl font-bold text-red-600">The Ad Agent</div>
+            </div>
             <h1 className="text-5xl font-bold mb-4">
               Welcome to <span className="text-red-600">The Ad Agent</span>
             </h1>
@@ -141,7 +147,12 @@ export default function SignIn() {
         >
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
-            <div className="text-4xl font-bold text-red-600 mb-4">The Ad Agent</div>
+            <div className="flex flex-col items-center mb-4">
+              <div className="w-16 h-16 flex items-center justify-center mb-2">
+                <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-contain" />
+              </div>
+              <div className="text-4xl font-bold text-red-600">The Ad Agent</div>
+            </div>
             <h2 className="text-3xl font-bold">Sign In</h2>
           </div>
 

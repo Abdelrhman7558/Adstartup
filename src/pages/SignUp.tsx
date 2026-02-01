@@ -1,16 +1,13 @@
 import { useState, FormEvent, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, CheckCircle, Mail } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
-import { trialService } from '../lib/trialService';
 import CountrySelector from '../components/CountrySelector';
+import logoNew from '../assets/logo-new.png';
 
 export default function SignUp() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const isTrial = searchParams.get('trial') === 'true';
   const { signUp, signInWithGoogle, user: authUser } = useAuth();
   const [loadingFlow, setLoadingFlow] = useState(false);
 
@@ -59,7 +56,7 @@ export default function SignUp() {
     setIsLoading(true);
 
     try {
-      const { error: authError, data } = await signUp(email, password, fullName, phoneNumber, country);
+      const { error: authError } = await signUp(email, password, fullName, phoneNumber, country);
 
       if (authError) {
         setError(authError.message);
@@ -117,7 +114,12 @@ export default function SignUp() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="text-6xl font-bold text-red-600 mb-6">The Ad Agent</div>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center p-2">
+                <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-contain" />
+              </div>
+              <div className="text-6xl font-bold text-red-600">The Ad Agent</div>
+            </div>
             <h1 className="text-5xl font-bold mb-4">
               Join <span className="text-red-600">The Ad Agent</span>
             </h1>
@@ -216,7 +218,12 @@ export default function SignUp() {
             >
               {/* Mobile Logo */}
               <div className="lg:hidden mb-8 text-center">
-                <div className="text-4xl font-bold text-red-600 mb-4">The Ad Agent</div>
+                <div className="flex flex-col items-center mb-4">
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center p-2 mb-2">
+                    <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-contain" />
+                  </div>
+                  <div className="text-4xl font-bold text-red-600">The Ad Agent</div>
+                </div>
                 <h2 className="text-3xl font-bold">Sign Up</h2>
               </div>
 

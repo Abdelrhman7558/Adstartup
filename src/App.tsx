@@ -26,7 +26,7 @@ function AppContent() {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <img src="/logo-new.png" alt="Logo" className="w-16 h-16 rounded-full object-contain mx-auto mb-4" />
           <div className="text-2xl font-bold text-red-600">The Ad Agent</div>
           <div className="text-gray-400 mt-2">Loading...</div>
         </div>

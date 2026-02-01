@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Target, Linkedin, Facebook } from 'lucide-react';
+import { Linkedin, Facebook } from 'lucide-react';
+import logoNew from '../assets/logo-new.png';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -10,8 +11,8 @@ const Footer = () => {
         <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-12 mb-12">
           <div className="lg:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-lg flex items-center justify-center">
-                <Target className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center overflow-hidden">
+                <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-cover" />
               </div>
               <span className="text-2xl font-bold text-white">The Ad Agent</span>
             </div>
