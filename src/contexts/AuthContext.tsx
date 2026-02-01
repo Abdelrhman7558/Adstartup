@@ -25,6 +25,7 @@ interface AuthContextType {
   refreshBrief: () => Promise<void>;
   refreshMetaConnection: () => Promise<void>;
   countryCode?: string;
+  trialExpired: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [hasBrief, setHasBrief] = useState(false);
   const [isMetaConnected, setIsMetaConnected] = useState(false);
   const [countryCode, setCountryCode] = useState('US');
+  const [trialExpired, setTrialExpired] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -93,7 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsSubscribed(false);
         setHasBrief(false);
         setIsMetaConnected(false);
+        setHasBrief(false);
+        setIsMetaConnected(false);
         setCountryCode('US');
+        setTrialExpired(false);
         setLoading(false);
       }
     });
@@ -175,9 +180,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setSubscription(data);
       setIsSubscribed(!!data || !!hasActiveTrial);
+      setTrialExpired(!!userData?.trial_expired);
     } catch (error) {
       console.error('Error loading subscription:', error);
       setIsSubscribed(false);
+      setTrialExpired(false);
     }
   };
 
@@ -485,6 +492,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshSubscription,
     refreshBrief,
     refreshMetaConnection,
+    trialExpired,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

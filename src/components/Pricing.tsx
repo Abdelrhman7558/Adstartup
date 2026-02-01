@@ -5,7 +5,7 @@ import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useAuth } from '../contexts/AuthContext';
 
 const Pricing = () => {
-  const { user } = useAuth();
+  const { user, trialExpired } = useAuth();
   const navigate = useNavigate();
   const headingRef = useScrollAnimation();
   const plansRef = useScrollAnimation({ threshold: 0.2 });
@@ -68,8 +68,8 @@ const Pricing = () => {
             <div
               key={index}
               className={`relative bg-white rounded-2xl p-8 border-2 max-w-md w-full ${plan.popular
-                  ? 'border-red-600 shadow-xl shadow-red-600/10'
-                  : 'border-gray-200 hover:border-gray-300'
+                ? 'border-red-600 shadow-xl shadow-red-600/10'
+                : 'border-gray-200 hover:border-gray-300'
                 } transition-all duration-300 hover:-translate-y-1 ${plansRef.isVisible ? 'animate-slide-up opacity-100' : 'opacity-0'
                 }`}
               style={{ animationDelay: `${index * 150}ms` }}
@@ -106,13 +106,15 @@ const Pricing = () => {
                   <span>Subscribe Now</span>
                   <ArrowRight className="w-5 h-5" />
                 </button>
-                <button
-                  onClick={handleTrialClick}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all inline-flex items-center justify-center space-x-2 shadow-lg shadow-green-600/25"
-                >
-                  <span>Trial 14-days Free</span>
-                  <ArrowRight className="w-5 h-5" />
-                </button>
+                {!trialExpired && (
+                  <button
+                    onClick={handleTrialClick}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all inline-flex items-center justify-center space-x-2 shadow-lg shadow-green-600/25"
+                  >
+                    <span>Trial 14-days Free</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                )}
               </div>
 
               <div className="space-y-3 pt-6 border-t border-gray-200">
