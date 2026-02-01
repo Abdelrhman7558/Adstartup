@@ -1,4 +1,3 @@
-import React from 'react';
 import { Brain, DollarSign, Target, TrendingUp, BarChart3, Zap } from 'lucide-react';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 
@@ -62,9 +61,8 @@ const AIEngine = () => {
           {features.map((feature, index) => (
             <div
               key={index}
-              className={`group bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-red-600 transition-all duration-300 hover:shadow-lg ${
-                featuresRef.isVisible ? 'animate-slide-up opacity-100' : 'opacity-0'
-              }`}
+              className={`group bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-red-600 transition-all duration-300 hover:shadow-lg ${featuresRef.isVisible ? 'animate-slide-up opacity-100' : 'opacity-0'
+                }`}
               style={{ animationDelay: `${index * 100}ms` }}
             >
               <div className="w-14 h-14 bg-gradient-to-br from-red-50 to-red-100 rounded-xl flex items-center justify-center mb-6 group-hover:from-red-100 group-hover:to-red-200 transition-colors">
@@ -80,16 +78,15 @@ const AIEngine = () => {
           ))}
         </div>
 
-        <div ref={bottomSectionRef.ref} className={`bg-gradient-to-br from-gray-900 to-black rounded-2xl p-8 lg:p-12 border border-gray-800 ${
-          bottomSectionRef.isVisible ? 'animate-scale-in opacity-100' : 'opacity-0'
-        }`}>
+        <div ref={bottomSectionRef.ref} className={`bg-gradient-to-br from-gray-900 to-black rounded-2xl p-8 lg:p-12 border border-gray-800 ${bottomSectionRef.isVisible ? 'animate-scale-in opacity-100' : 'opacity-0'
+          }`}>
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
               <h3 className="text-3xl font-bold text-white mb-6">
                 Technical but Simple
               </h3>
               <p className="text-gray-400 text-lg leading-relaxed mb-8">
-                Behind the scenes, Adstartup uses advanced machine learning algorithms, real-time data processing, and Meta's Marketing API to execute campaigns with precision.
+                Behind the scenes, The Ad Agent uses advanced machine learning algorithms, real-time data processing, and Meta's Marketing API to execute campaigns with precision.
               </p>
               <p className="text-gray-400 text-lg leading-relaxed mb-8">
                 But you don't need to understand any of that. Just set your goals, and let AI do the heavy lifting.

@@ -16,10 +16,10 @@ export default function Header() {
 
   const initials = profile?.full_name
     ? profile.full_name
-        .split(' ')
-        .map(n => n[0])
-        .join('')
-        .toUpperCase()
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
     : user?.email?.[0].toUpperCase() || 'U';
 
   const email = user?.email || '';
@@ -94,7 +94,7 @@ export default function Header() {
   if (loading) {
     return (
       <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-6">
-        <div className="text-lg font-bold text-gray-900 dark:text-white">Adstartup</div>
+        <div className="text-lg font-bold text-gray-900 dark:text-white">The Ad Agent</div>
       </header>
     );
   }
@@ -102,7 +102,7 @@ export default function Header() {
   return (
     <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-6 sticky top-0 z-40">
       <Link to="/" className="text-lg font-bold text-gray-900 dark:text-white hover:opacity-80 transition-opacity">
-        Adstartup
+        The Ad Agent
       </Link>
 
       <nav className="flex items-center gap-4">

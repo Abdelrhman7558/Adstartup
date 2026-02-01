@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Play, TrendingUp, DollarSign, Target } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -41,12 +41,11 @@ const Hero = () => {
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-black via-gray-900 to-black overflow-hidden">
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? 'bg-black/90 backdrop-blur-lg border-b border-gray-800 shadow-lg' : 'bg-black/80 backdrop-blur-md border-b border-gray-800'
-      }`}>
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-black/90 backdrop-blur-lg border-b border-gray-800 shadow-lg' : 'bg-black/80 backdrop-blur-md border-b border-gray-800'
+        }`}>
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <span className="text-2xl font-bold text-white">Adstartup</span>
+            <span className="text-2xl font-bold text-white">The Ad Agent</span>
           </div>
           <div className="hidden md:flex items-center space-x-8">
             <a href="#how-it-works" className="text-gray-300 hover:text-white transition-colors duration-200 relative group">
@@ -86,29 +85,25 @@ const Hero = () => {
       <div className="max-w-7xl mx-auto px-6 pt-32 pb-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
-            <div className={`inline-flex items-center space-x-2 bg-red-600/10 border border-red-600/20 rounded-full px-4 py-2 ${
-              isVisible ? 'animate-slide-up-fast opacity-100' : 'opacity-0'
-            }`}>
+            <div className={`inline-flex items-center space-x-2 bg-red-600/10 border border-red-600/20 rounded-full px-4 py-2 ${isVisible ? 'animate-slide-up-fast opacity-100' : 'opacity-0'
+              }`}>
               <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>
               <span className="text-red-600 text-sm font-semibold">AI-Powered Meta Ads Automation</span>
             </div>
-            <h1 className={`text-5xl lg:text-7xl font-bold text-white leading-tight ${
-              isVisible ? 'animate-slide-up animation-delay-100 opacity-100' : 'opacity-0'
-            }`}>
+            <h1 className={`text-5xl lg:text-7xl font-bold text-white leading-tight ${isVisible ? 'animate-slide-up animation-delay-100 opacity-100' : 'opacity-0'
+              }`}>
               Launch, optimize, and scale Meta ads —{' '}
               <span className="bg-gradient-to-r from-red-600 to-red-400 bg-clip-text text-transparent inline-block transform transition-all duration-300 hover:scale-105">
                 automatically
               </span>
             </h1>
-            <p className={`text-xl text-gray-400 leading-relaxed ${
-              isVisible ? 'animate-fade-in animation-delay-300 opacity-100' : 'opacity-0'
-            }`}>
+            <p className={`text-xl text-gray-400 leading-relaxed ${isVisible ? 'animate-fade-in animation-delay-300 opacity-100' : 'opacity-0'
+              }`}>
               AI turns your brief into live Meta ads using your own Business Manager.
               No manual setup. No agency fees. Complete ownership and control.
             </p>
-            <div className={`flex flex-col sm:flex-row gap-4 ${
-              isVisible ? 'animate-fade-in animation-delay-400 opacity-100' : 'opacity-0'
-            }`}>
+            <div className={`flex flex-col sm:flex-row gap-4 ${isVisible ? 'animate-fade-in animation-delay-400 opacity-100' : 'opacity-0'
+              }`}>
               <button
                 onClick={handleCTAClick}
                 className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg shadow-red-600/25 hover:shadow-red-600/40 hover:scale-105 active:scale-95 group"
@@ -124,9 +119,8 @@ const Hero = () => {
                 <span>See How It Works</span>
               </button>
             </div>
-            <div className={`flex items-center space-x-6 text-sm text-gray-500 ${
-              isVisible ? 'animate-fade-in animation-delay-600 opacity-100' : 'opacity-0'
-            }`}>
+            <div className={`flex items-center space-x-6 text-sm text-gray-500 ${isVisible ? 'animate-fade-in animation-delay-600 opacity-100' : 'opacity-0'
+              }`}>
               <div className="flex items-center space-x-2">
                 <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -142,9 +136,8 @@ const Hero = () => {
             </div>
           </div>
 
-          <div className={`relative ${
-            isVisible ? 'animate-scale-in animation-delay-400 opacity-100' : 'opacity-0'
-          }`}>
+          <div className={`relative ${isVisible ? 'animate-scale-in animation-delay-400 opacity-100' : 'opacity-0'
+            }`}>
             <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-2xl border border-gray-700 hover:border-gray-600 transition-all duration-300">
               <div className="flex items-center space-x-2 mb-4">
                 <div className="w-3 h-3 bg-red-500 rounded-full"></div>

@@ -159,7 +159,7 @@ const FeatureRotation = () => {
             </span>
           </h2>
           <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-            From automated execution to real-time optimization, Adstartup handles every aspect of Meta ad management.
+            From automated execution to real-time optimization, The Ad Agent handles every aspect of Meta ad management.
           </p>
         </div>
 
@@ -179,11 +179,10 @@ const FeatureRotation = () => {
                     {features.map((_, index) => (
                       <div
                         key={index}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${
-                          index === activeIndex
+                        className={`h-1.5 rounded-full transition-all duration-300 ${index === activeIndex
                             ? 'w-8 bg-red-600'
                             : 'w-1.5 bg-gray-600'
-                        }`}
+                          }`}
                       />
                     ))}
                   </div>

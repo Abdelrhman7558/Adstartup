@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { Target, Linkedin, Facebook } from 'lucide-react';
 
@@ -14,7 +13,7 @@ const Footer = () => {
               <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-lg flex items-center justify-center">
                 <Target className="w-6 h-6 text-white" />
               </div>
-              <span className="text-2xl font-bold text-white">Adstartup</span>
+              <span className="text-2xl font-bold text-white">The Ad Agent</span>
             </div>
             <p className="text-gray-400 leading-relaxed mb-6 max-w-md">
               AI-powered Meta ads automation platform. Launch, optimize, and scale campaigns automatically using your own Business Manager.
@@ -121,7 +120,7 @@ const Footer = () => {
         <div className="pt-8 border-t border-gray-800">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
             <p className="text-gray-500 text-sm">
-              © {currentYear} Adstartup. All rights reserved.
+              © {currentYear} The Ad Agent. All rights reserved.
             </p>
             <div className="flex items-center space-x-6 text-sm">
               <a href="#" className="text-gray-500 hover:text-white transition-colors">

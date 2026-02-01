@@ -6,5 +6,5 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 2000
   },
-  base: process.env.VITE_BASE_PATH || "/Adstartup"
+  base: process.env.VITE_BASE_PATH || "/TheAdAgent"
 })

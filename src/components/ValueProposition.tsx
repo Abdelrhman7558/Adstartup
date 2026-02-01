@@ -30,7 +30,7 @@ const ValueProposition = () => {
     {
       icon: Shield,
       title: 'Keep Full Ownership',
-      description: 'Your ad account. Your data. Your results. Adstartup operates as your AI execution layer, not a middleman.',
+      description: 'Your ad account. Your data. Your results. The Ad Agent operates as your AI execution layer, not a middleman.',
       highlight: false,
     },
     {
@@ -62,9 +62,8 @@ const ValueProposition = () => {
           {problems.map((problem, index) => (
             <div
               key={index}
-              className={`group bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 rounded-2xl p-8 hover:border-red-600 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
-                problemsRef.isVisible ? 'animate-slide-up opacity-100' : 'opacity-0'
-              }`}
+              className={`group bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 rounded-2xl p-8 hover:border-red-600 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${problemsRef.isVisible ? 'animate-slide-up opacity-100' : 'opacity-0'
+                }`}
               style={{ animationDelay: `${index * 150}ms` }}
             >
               <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center mb-6 shadow-sm group-hover:shadow-md transition-shadow">
@@ -83,7 +82,7 @@ const ValueProposition = () => {
         <div ref={solutionHeadingRef.ref} className={`text-center mb-16 ${solutionHeadingRef.isVisible ? 'animate-slide-up opacity-100' : 'opacity-0'}`}>
           <div className="inline-flex items-center space-x-2 bg-red-600/10 border border-red-600/20 rounded-full px-4 py-2 mb-6">
             <Zap className="w-4 h-4 text-red-600" />
-            <span className="text-red-600 text-sm font-semibold">The Adstartup Solution</span>
+            <span className="text-red-600 text-sm font-semibold">The The Ad Agent Solution</span>
           </div>
           <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
             AI-Powered Execution,{' '}
@@ -92,7 +91,7 @@ const ValueProposition = () => {
             </span>
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Adstartup doesn't just suggest what to do. It executes automatically using your Meta Business Manager.
+            The Ad Agent doesn't just suggest what to do. It executes automatically using your Meta Business Manager.
           </p>
         </div>
 
@@ -100,15 +99,12 @@ const ValueProposition = () => {
           {solutions.map((solution, index) => (
             <div
               key={index}
-              className={`relative bg-gradient-to-br ${
-                solution.highlight
+              className={`relative bg-gradient-to-br ${solution.highlight
                   ? 'from-red-600 to-red-700 text-white'
                   : 'from-white to-gray-50 text-gray-900'
-              } border-2 ${
-                solution.highlight ? 'border-red-600' : 'border-gray-200'
-              } rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${
-                solutionsRef.isVisible ? 'animate-slide-up opacity-100' : 'opacity-0'
-              }`}
+                } border-2 ${solution.highlight ? 'border-red-600' : 'border-gray-200'
+                } rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${solutionsRef.isVisible ? 'animate-slide-up opacity-100' : 'opacity-0'
+                }`}
               style={{ animationDelay: `${index * 150}ms` }}
             >
               {solution.highlight && (
@@ -119,27 +115,23 @@ const ValueProposition = () => {
                 </div>
               )}
               <div
-                className={`w-14 h-14 ${
-                  solution.highlight ? 'bg-white/20' : 'bg-red-50'
-                } rounded-xl flex items-center justify-center mb-6`}
+                className={`w-14 h-14 ${solution.highlight ? 'bg-white/20' : 'bg-red-50'
+                  } rounded-xl flex items-center justify-center mb-6`}
               >
                 <solution.icon
-                  className={`w-7 h-7 ${
-                    solution.highlight ? 'text-white' : 'text-red-600'
-                  }`}
+                  className={`w-7 h-7 ${solution.highlight ? 'text-white' : 'text-red-600'
+                    }`}
                 />
               </div>
               <h3
-                className={`text-xl font-bold mb-3 ${
-                  solution.highlight ? 'text-white' : 'text-gray-900'
-                }`}
+                className={`text-xl font-bold mb-3 ${solution.highlight ? 'text-white' : 'text-gray-900'
+                  }`}
               >
                 {solution.title}
               </h3>
               <p
-                className={`leading-relaxed ${
-                  solution.highlight ? 'text-red-100' : 'text-gray-600'
-                }`}
+                className={`leading-relaxed ${solution.highlight ? 'text-red-100' : 'text-gray-600'
+                  }`}
               >
                 {solution.description}
               </p>

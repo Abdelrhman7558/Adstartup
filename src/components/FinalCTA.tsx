@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Zap, Target } from 'lucide-react';
 import gsap from 'gsap';
@@ -63,7 +63,7 @@ const FinalCTA = () => {
               Automation.
             </span>
             <br />
-            Adstartup Is.
+            The Ad Agent Is.
           </h2>
 
           <p className="text-xl text-gray-400 mb-10 max-w-3xl mx-auto leading-relaxed">

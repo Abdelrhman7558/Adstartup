@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ChevronDown, HelpCircle } from 'lucide-react';
 
 const FAQ = () => {
@@ -6,20 +6,20 @@ const FAQ = () => {
 
   const faqs = [
     {
-      question: 'Is Adstartup Meta compliant?',
-      answer: 'Yes, absolutely. Adstartup uses the official Meta Marketing API and follows all Meta advertising policies. Your campaigns are created and managed using the same infrastructure that agencies use, ensuring full compliance with Meta\'s terms of service.',
+      question: 'Is The Ad Agent Meta compliant?',
+      answer: 'Yes, absolutely. The Ad Agent uses the official Meta Marketing API and follows all Meta advertising policies. Your campaigns are created and managed using the same infrastructure that agencies use, ensuring full compliance with Meta\'s terms of service.',
     },
     {
       question: 'Do you control my ad account?',
-      answer: 'No. You maintain complete ownership and control of your Meta ad account. Adstartup simply connects via OAuth to execute campaigns on your behalf. You can revoke access at any time, and you always have full visibility into every action taken in your Meta Ads Manager.',
+      answer: 'No. You maintain complete ownership and control of your Meta ad account. The Ad Agent simply connects via OAuth to execute campaigns on your behalf. You can revoke access at any time, and you always have full visibility into every action taken in your Meta Ads Manager.',
     },
     {
       question: 'Can I stop or modify campaigns anytime?',
-      answer: 'Yes. You have full control through both Adstartup\'s dashboard and your Meta Ads Manager. You can pause, stop, or modify any campaign at any time. Adstartup works alongside your existing Meta infrastructure, not as a replacement.',
+      answer: 'Yes. You have full control through both The Ad Agent\'s dashboard and your Meta Ads Manager. You can pause, stop, or modify any campaign at any time. The Ad Agent works alongside your existing Meta infrastructure, not as a replacement.',
     },
     {
       question: 'Who owns the campaign data and results?',
-      answer: 'You do. All campaign data, performance metrics, and results belong to you. Everything runs in your Meta ad account, and you can export or analyze data using Meta\'s native tools or Adstartup\'s dashboard.',
+      answer: 'You do. All campaign data, performance metrics, and results belong to you. Everything runs in your Meta ad account, and you can export or analyze data using Meta\'s native tools or The Ad Agent\'s dashboard.',
     },
     {
       question: 'How fast do campaigns go live after I submit a brief?',
@@ -27,15 +27,15 @@ const FAQ = () => {
     },
     {
       question: 'What if I already have active campaigns?',
-      answer: 'No problem. Adstartup can work alongside your existing campaigns without interfering. You can choose to let AI manage specific campaigns while keeping others under manual control. It\'s your choice.',
+      answer: 'No problem. The Ad Agent can work alongside your existing campaigns without interfering. You can choose to let AI manage specific campaigns while keeping others under manual control. It\'s your choice.',
     },
     {
-      question: 'Do I need technical expertise to use Adstartup?',
-      answer: 'Not at all. Adstartup is designed for business owners, marketers, and entrepreneurs who want results without technical complexity. Just answer simple questions in the campaign brief, and AI handles the technical execution.',
+      question: 'Do I need technical expertise to use The Ad Agent?',
+      answer: 'Not at all. The Ad Agent is designed for business owners, marketers, and entrepreneurs who want results without technical complexity. Just answer simple questions in the campaign brief, and AI handles the technical execution.',
     },
     {
       question: 'What happens if I cancel my subscription?',
-      answer: 'Your campaigns will continue running in your Meta ad account. You\'ll lose access to Adstartup\'s optimization and automation features, but your ads and data remain yours. You can manage them manually through Meta Ads Manager.',
+      answer: 'Your campaigns will continue running in your Meta ad account. You\'ll lose access to The Ad Agent\'s optimization and automation features, but your ads and data remain yours. You can manage them manually through Meta Ads Manager.',
     },
     {
       question: 'How does the free trial work?',
@@ -58,7 +58,7 @@ const FAQ = () => {
             </span>
           </h2>
           <p className="text-xl text-gray-600">
-            Everything you need to know about Adstartup and automated Meta ads.
+            Everything you need to know about The Ad Agent and automated Meta ads.
           </p>
         </div>
 
@@ -76,9 +76,8 @@ const FAQ = () => {
                   {faq.question}
                 </span>
                 <ChevronDown
-                  className={`w-5 h-5 text-gray-500 flex-shrink-0 transition-transform ${
-                    openIndex === index ? 'transform rotate-180' : ''
-                  }`}
+                  className={`w-5 h-5 text-gray-500 flex-shrink-0 transition-transform ${openIndex === index ? 'transform rotate-180' : ''
+                    }`}
                 />
               </button>
               {openIndex === index && (
@@ -95,7 +94,7 @@ const FAQ = () => {
             Still have questions?
           </h3>
           <p className="text-gray-600 mb-6">
-            Our team is here to help. Get in touch and we'll answer any questions about how Adstartup can work for your business.
+            Our team is here to help. Get in touch and we'll answer any questions about how The Ad Agent can work for your business.
           </p>
           <button className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-semibold transition-all inline-flex items-center space-x-2">
             <span>Contact Support</span>

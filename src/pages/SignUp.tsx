@@ -117,9 +117,9 @@ export default function SignUp() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="text-6xl font-bold text-red-600 mb-6">Adstartup</div>
+            <div className="text-6xl font-bold text-red-600 mb-6">The Ad Agent</div>
             <h1 className="text-5xl font-bold mb-4">
-              Join <span className="text-red-600">Adstartup</span>
+              Join <span className="text-red-600">The Ad Agent</span>
             </h1>
             <p className="text-gray-400 text-lg">
               Start creating powerful advertising campaigns in minutes.
@@ -216,14 +216,14 @@ export default function SignUp() {
             >
               {/* Mobile Logo */}
               <div className="lg:hidden mb-8 text-center">
-                <div className="text-4xl font-bold text-red-600 mb-4">Adstartup</div>
+                <div className="text-4xl font-bold text-red-600 mb-4">The Ad Agent</div>
                 <h2 className="text-3xl font-bold">Sign Up</h2>
               </div>
 
               {/* Desktop Title */}
               <div className="hidden lg:block mb-8">
                 <h2 className="text-4xl font-bold mb-2">Create Account</h2>
-                <p className="text-gray-400">Get started with Adstartup today</p>
+                <p className="text-gray-400">Get started with The Ad Agent today</p>
               </div>
 
               <AnimatePresence>

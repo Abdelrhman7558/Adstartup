@@ -14,12 +14,11 @@ export default function TermsOfService() {
         </Link>
 
         <div className="prose prose-lg dark:prose-invert max-w-none">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Terms of Service of Adstartup</h1>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Terms of Service of The Ad Agent</h1>
           <p className="text-gray-600 dark:text-gray-400 mb-8">Last updated: December 2025</p>
 
           <p className="text-gray-700 dark:text-gray-300">
-            These Terms of Service ("Terms") govern your use of the Services provided by Adstartup, founded by عبد
-            الرحمن. By accessing or using our Services, you agree to be bound by these Terms.
+            These Terms of Service ("Terms") govern your use of the Services provided by The Ad Agent. By accessing or using our Services, you agree to be bound by these Terms.
           </p>
 
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mt-8 mb-4">1. Acceptance of Terms</h2>
@@ -51,7 +50,7 @@ export default function TermsOfService() {
           <ul className="list-disc pl-6 space-y-2 text-gray-700 dark:text-gray-300">
             <li>Services are provided "as-is" and "as-available"</li>
             <li>
-              Adstartup reserves the right to suspend, modify, or discontinue Services at any time without prior
+              The Ad Agent reserves the right to suspend, modify, or discontinue Services at any time without prior
               notice
             </li>
           </ul>
@@ -59,7 +58,7 @@ export default function TermsOfService() {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mt-8 mb-4">6. Limitation of Liability</h2>
           <ul className="list-disc pl-6 space-y-2 text-gray-700 dark:text-gray-300">
             <li>
-              Adstartup is not liable for indirect, incidental, or consequential damages arising from use of the
+              The Ad Agent is not liable for indirect, incidental, or consequential damages arising from use of the
               Services
             </li>
             <li>Liability is limited to the maximum extent permitted by law</li>
@@ -86,7 +85,7 @@ export default function TermsOfService() {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mt-8 mb-4">10. Contact Information</h2>
           <p className="text-gray-700 dark:text-gray-300">For questions regarding these Terms:</p>
           <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg mt-4">
-            <p className="font-semibold text-gray-900 dark:text-white">Adstartup</p>
+            <p className="font-semibold text-gray-900 dark:text-white">The Ad Agent</p>
             <p className="text-gray-700 dark:text-gray-300">Email: support@ad-startup.com</p>
           </div>
         </div>

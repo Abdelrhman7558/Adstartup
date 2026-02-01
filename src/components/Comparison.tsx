@@ -1,4 +1,3 @@
-import React from 'react';
 import { X, Check, AlertCircle } from 'lucide-react';
 
 const Comparison = () => {
@@ -56,7 +55,7 @@ const Comparison = () => {
             <span className="text-red-600 text-sm font-semibold">The Difference</span>
           </div>
           <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-            Adstartup vs{' '}
+            The Ad Agent vs{' '}
             <span className="bg-gradient-to-r from-red-600 to-red-400 bg-clip-text text-transparent">
               The Old Way
             </span>
@@ -82,7 +81,7 @@ const Comparison = () => {
                       Tools
                     </th>
                     <th className="px-6 py-4 text-left text-sm font-bold text-red-600 uppercase tracking-wider bg-red-50">
-                      Adstartup
+                      The Ad Agent
                     </th>
                   </tr>
                 </thead>
@@ -162,7 +161,7 @@ const Comparison = () => {
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-6">
               <Check className="w-6 h-6 text-white" />
             </div>
-            <h3 className="text-xl font-bold text-white mb-3">Adstartup</h3>
+            <h3 className="text-xl font-bold text-white mb-3">The Ad Agent</h3>
             <p className="text-red-100 mb-4">
               Fully automated execution with complete ownership and transparent results.
             </p>

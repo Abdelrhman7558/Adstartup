@@ -1,4 +1,3 @@
-import React from 'react';
 import { TrendingUp, Users, ShoppingCart, Briefcase } from 'lucide-react';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useCountUp } from '../hooks/useCountUp';
@@ -64,7 +63,7 @@ const Results = () => {
             </span>
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Whether you're scaling an e-commerce store, generating B2B leads, or managing client accounts, Adstartup adapts to your needs.
+            Whether you're scaling an e-commerce store, generating B2B leads, or managing client accounts, The Ad Agent adapts to your needs.
           </p>
         </div>
 
@@ -72,9 +71,8 @@ const Results = () => {
           {useCases.map((useCase, index) => (
             <div
               key={index}
-              className={`bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-red-600 transition-all duration-300 hover:shadow-lg group ${
-                cardsRef.isVisible ? 'animate-slide-up opacity-100' : 'opacity-0'
-              }`}
+              className={`bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-red-600 transition-all duration-300 hover:shadow-lg group ${cardsRef.isVisible ? 'animate-slide-up opacity-100' : 'opacity-0'
+                }`}
               style={{ animationDelay: `${index * 150}ms` }}
             >
               <div className="w-14 h-14 bg-gradient-to-br from-red-50 to-red-100 rounded-xl flex items-center justify-center mb-6 group-hover:from-red-100 group-hover:to-red-200 transition-colors">
@@ -103,15 +101,14 @@ const Results = () => {
           ))}
         </div>
 
-        <div ref={metricsRef.ref} className={`bg-gradient-to-br from-gray-900 to-black rounded-2xl p-8 lg:p-12 border border-gray-800 ${
-          metricsRef.isVisible ? 'animate-scale-in opacity-100' : 'opacity-0'
-        }`}>
+        <div ref={metricsRef.ref} className={`bg-gradient-to-br from-gray-900 to-black rounded-2xl p-8 lg:p-12 border border-gray-800 ${metricsRef.isVisible ? 'animate-scale-in opacity-100' : 'opacity-0'
+          }`}>
           <div className="text-center mb-12">
             <h3 className="text-3xl font-bold text-white mb-4">
               Performance That Speaks for Itself
             </h3>
             <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-              Real metrics from campaigns managed by Adstartup across different industries and budgets.
+              Real metrics from campaigns managed by The Ad Agent across different industries and budgets.
             </p>
           </div>
 
@@ -152,7 +149,7 @@ const Results = () => {
 
           <div className="mt-10 bg-gradient-to-r from-red-600/10 to-red-400/10 border border-red-600/20 rounded-xl p-6 text-center">
             <p className="text-gray-300 text-lg">
-              <span className="text-white font-semibold">"Adstartup delivers agency-level results at a fraction of the cost and time."</span>
+              <span className="text-white font-semibold">"The Ad Agent delivers agency-level results at a fraction of the cost and time."</span>
               <br />
               <span className="text-gray-400 text-base mt-2 block">— Marketing Director, 7-figure DTC Brand</span>
             </p>

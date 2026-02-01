@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AlertCircle, CheckCircle2, Loader } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader, Link2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { buildMetaOAuthUrl, checkMetaConnectionStatus, N8N_WEBHOOKS } from '../lib/oauthState';
 
@@ -136,7 +136,7 @@ export default function MetaAccountManager({ className = '' }: MetaAccountManage
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Disconnect Account?</h3>
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                This will disconnect your Meta account from Adstartup. You can reconnect anytime.
+                This will disconnect your Meta account from The Ad Agent. You can reconnect anytime.
               </p>
               <div className="flex gap-3">
                 <button

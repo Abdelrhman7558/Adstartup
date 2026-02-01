@@ -76,7 +76,7 @@ export default function ForgotPassword() {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="text-4xl font-bold text-red-600 mb-4">Adstartup</div>
+          <div className="text-4xl font-bold text-red-600 mb-4">The Ad Agent</div>
           <h2 className="text-3xl font-bold mb-2">Reset Password</h2>
           <p className="text-gray-400">Enter your email to receive a reset link</p>
         </div>

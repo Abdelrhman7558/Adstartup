@@ -113,9 +113,9 @@ export default function SignIn() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="text-6xl font-bold text-red-600 mb-6">Adstartup</div>
+            <div className="text-6xl font-bold text-red-600 mb-6">The Ad Agent</div>
             <h1 className="text-5xl font-bold mb-4">
-              Welcome to <span className="text-red-600">Adstartup</span>
+              Welcome to <span className="text-red-600">The Ad Agent</span>
             </h1>
             <p className="text-gray-400 text-lg">
               Launch your advertising campaigns with precision and speed.
@@ -141,7 +141,7 @@ export default function SignIn() {
         >
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
-            <div className="text-4xl font-bold text-red-600 mb-4">Adstartup</div>
+            <div className="text-4xl font-bold text-red-600 mb-4">The Ad Agent</div>
             <h2 className="text-3xl font-bold">Sign In</h2>
           </div>
 

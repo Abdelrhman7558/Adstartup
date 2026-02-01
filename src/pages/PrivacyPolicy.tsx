@@ -14,11 +14,11 @@ export default function PrivacyPolicy() {
         </Link>
 
         <div className="prose prose-lg dark:prose-invert max-w-none">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Privacy Policy of Adstartup</h1>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Privacy Policy of The Ad Agent</h1>
           <p className="text-gray-600 dark:text-gray-400 mb-8">Last updated: December 2025</p>
 
           <p className="text-gray-700 dark:text-gray-300">
-            At Adstartup, founded by عبد الرحمن, your privacy is our priority. This Privacy Policy explains how we
+            At The Ad Agent, your privacy is our priority. This Privacy Policy explains how we
             collect, use, and protect your information when you use our website, dashboard, or services (collectively,
             "Services").
           </p>
@@ -91,7 +91,7 @@ export default function PrivacyPolicy() {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mt-8 mb-4">8. Contact Information</h2>
           <p className="text-gray-700 dark:text-gray-300">For any privacy-related inquiries, please contact:</p>
           <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg mt-4">
-            <p className="font-semibold text-gray-900 dark:text-white">Adstartup</p>
+            <p className="font-semibold text-gray-900 dark:text-white">The Ad Agent</p>
             <p className="text-gray-700 dark:text-gray-300">Email: support@ad-startup.com</p>
           </div>
         </div>

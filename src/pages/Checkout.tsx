@@ -203,7 +203,7 @@ const Checkout = () => {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">Complete Your Subscription</h1>
           <p className="text-gray-400 text-lg">
-            Join Adstartup and start automating your Meta ads today
+            Join The Ad Agent and start automating your Meta ads today
           </p>
         </div>
 

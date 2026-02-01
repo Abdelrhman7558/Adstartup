@@ -13,7 +13,7 @@ import MetaCallback from './pages/MetaCallback';
 import MetaSelect from './pages/MetaSelect';
 import Brief from './pages/Brief';
 import Dashboard from './pages/Dashboard';
-import NewDashboard from './pages/NewDashboard';
+// import NewDashboard from './pages/NewDashboard';
 import ProductionDashboard from './pages/ProductionDashboard';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
@@ -27,7 +27,7 @@ function AppContent() {
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <div className="text-2xl font-bold text-red-600">Adstartup</div>
+          <div className="text-2xl font-bold text-red-600">The Ad Agent</div>
           <div className="text-gray-400 mt-2">Loading...</div>
         </div>
       </div>

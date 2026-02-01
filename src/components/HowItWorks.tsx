@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link2, Target, FileText, Zap, Activity, TrendingUp } from 'lucide-react';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 
@@ -14,7 +13,7 @@ const HowItWorks = () => {
       icon: Target,
       number: '02',
       title: 'Select Ad Account, Pixel & Catalog',
-      description: 'Choose which ad account, tracking pixel, and product catalog to use. Adstartup works with your existing setup.',
+      description: 'Choose which ad account, tracking pixel, and product catalog to use. The Ad Agent works with your existing setup.',
     },
     {
       icon: FileText,
@@ -69,9 +68,8 @@ const HowItWorks = () => {
           {steps.map((step, index) => (
             <div
               key={index}
-              className={`group relative bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-red-600 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${
-                stepsRef.isVisible ? 'animate-slide-up opacity-100' : 'opacity-0'
-              }`}
+              className={`group relative bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-red-600 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${stepsRef.isVisible ? 'animate-slide-up opacity-100' : 'opacity-0'
+                }`}
               style={{ animationDelay: `${index * 100}ms` }}
             >
               <div className="absolute -top-4 -left-4 w-12 h-12 bg-gradient-to-br from-red-600 to-red-700 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">
@@ -90,16 +88,15 @@ const HowItWorks = () => {
           ))}
         </div>
 
-        <div ref={bottomSectionRef.ref} className={`mt-16 bg-gradient-to-br from-gray-900 to-black rounded-2xl p-8 lg:p-12 border border-gray-800 ${
-          bottomSectionRef.isVisible ? 'animate-scale-in opacity-100' : 'opacity-0'
-        }`}>
+        <div ref={bottomSectionRef.ref} className={`mt-16 bg-gradient-to-br from-gray-900 to-black rounded-2xl p-8 lg:p-12 border border-gray-800 ${bottomSectionRef.isVisible ? 'animate-scale-in opacity-100' : 'opacity-0'
+          }`}>
           <div className="grid lg:grid-cols-2 gap-8 items-center">
             <div>
               <h3 className="text-3xl font-bold text-white mb-4">
                 Complete API Integration
               </h3>
               <p className="text-gray-400 text-lg leading-relaxed mb-6">
-                Adstartup uses the official Meta Marketing API to create and manage campaigns directly in your ad account. Every action is transparent and visible in your Meta Ads Manager.
+                The Ad Agent uses the official Meta Marketing API to create and manage campaigns directly in your ad account. Every action is transparent and visible in your Meta Ads Manager.
               </p>
               <div className="space-y-3">
                 {['Campaign creation & structure', 'Ad set configuration', 'Creative deployment', 'Budget management', 'Performance tracking'].map((item, index) => (
