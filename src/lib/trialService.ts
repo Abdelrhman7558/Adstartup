@@ -12,7 +12,7 @@ export const trialService = {
   async createTrial(userId: string): Promise<void> {
     const startDate = new Date();
     const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 14);
+    endDate.setDate(endDate.getDate() + 7);
 
     const { error } = await supabase
       .from('users')
@@ -38,9 +38,9 @@ export const trialService = {
     if (!data) return null;
 
     const isActive = data.plan_type === 'trial' &&
-                     !data.trial_expired &&
-                     data.trial_end_at &&
-                     new Date(data.trial_end_at) > new Date();
+      !data.trial_expired &&
+      data.trial_end_at &&
+      new Date(data.trial_end_at) > new Date();
 
     return {
       id: data.id,

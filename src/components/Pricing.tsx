@@ -5,20 +5,12 @@ import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useAuth } from '../contexts/AuthContext';
 
 const Pricing = () => {
-  const { user, trialExpired } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const headingRef = useScrollAnimation();
   const plansRef = useScrollAnimation({ threshold: 0.2 });
 
-  const handleSubscribeClick = () => {
-    navigate('/payment', {
-      state: {
-        planName: 'SOLO',
-        price: 39,
-        billingPeriod: 'monthly'
-      }
-    });
-  };
+
 
   const handleTrialClick = () => {
     if (!user) {
@@ -100,21 +92,12 @@ const Pricing = () => {
 
               <div className="flex flex-col gap-3 mb-6">
                 <button
-                  onClick={handleSubscribeClick}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-all inline-flex items-center justify-center space-x-2 shadow-lg shadow-red-600/25"
+                  onClick={handleTrialClick}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all inline-flex items-center justify-center space-x-2 shadow-lg shadow-green-600/25"
                 >
-                  <span>Subscribe Now</span>
+                  <span>Trial 7-days Free</span>
                   <ArrowRight className="w-5 h-5" />
                 </button>
-                {!trialExpired && (
-                  <button
-                    onClick={handleTrialClick}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all inline-flex items-center justify-center space-x-2 shadow-lg shadow-green-600/25"
-                  >
-                    <span>Trial 14-days Free</span>
-                    <ArrowRight className="w-5 h-5" />
-                  </button>
-                )}
               </div>
 
               <div className="space-y-3 pt-6 border-t border-gray-200">
@@ -134,7 +117,7 @@ const Pricing = () => {
 
         <div className="mt-12 text-center">
           <p className="text-gray-600 mb-6">
-            14-day free trial. No credit card required. Cancel anytime.
+            7-day free trial. No credit card required. Cancel anytime.
           </p>
           <div className="flex items-center justify-center space-x-6 text-sm text-gray-500">
             <div className="flex items-center space-x-2">
