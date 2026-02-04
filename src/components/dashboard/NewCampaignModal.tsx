@@ -5,6 +5,13 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { campaignAssetsService } from '../../lib/campaignAssetsService';
 import { sendCampaignToWebhook, sendCampaignIdWebhook } from '../../lib/webhookService';
+import { isManagerPlanUser } from '../../lib/managerPlanService';
+
+interface MetaAccount {
+  id: string;
+  account_id: string;
+  account_name: string;
+}
 
 interface NewCampaignModalProps {
   isOpen: boolean;
@@ -22,7 +29,7 @@ interface MetaCatalog {
   catalog_name: string;
 }
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
 const OBJECTIVE_OPTIONS = ['sales'];
 const GOAL_OPTIONS = ['increase sales'];
@@ -38,6 +45,11 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
   const [selectedCatalogId, setSelectedCatalogId] = useState('');
   const [selectedCatalogName, setSelectedCatalogName] = useState('');
   const [catalogs, setCatalogs] = useState<MetaCatalog[]>([]);
+
+  // Manager Plan: Multiple Accounts
+  const [accounts, setAccounts] = useState<MetaAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [selectedAccountName, setSelectedAccountName] = useState('');
 
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
@@ -64,6 +76,9 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
     if (isOpen && user) {
       loadPages();
       loadCatalogs();
+      if (isManagerPlanUser(user.email)) {
+        loadManagerAccounts();
+      }
       resetForm();
     }
   }, [isOpen, user]);
@@ -85,6 +100,31 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
     setSelectedPageId('');
     setSelectedPageName('');
     setError('');
+    setSelectedAccountId('');
+    setSelectedAccountName('');
+  };
+
+  const loadManagerAccounts = async () => {
+    if (!user) return;
+    try {
+      console.log('Fetching Manager accounts for:', user.email);
+      const { data, error } = await supabase
+        .from('manager_meta_accounts')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      console.log('Manager accounts fetched:', data);
+      setAccounts(data || []);
+
+      if (!data || data.length === 0) {
+        console.warn('No manager accounts found for this user.');
+      }
+    } catch (err) {
+      console.error('Failed to load accounts:', err);
+    }
   };
 
   const loadPages = async () => {
@@ -194,21 +234,29 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
       }
     }
 
-    // Step 2: Campaign Details (Moved from Step 3)
+    // Step 2: Account Selection
     if (currentStep === 2) {
+      if (isManagerPlanUser(user?.email) && accounts.length > 0 && !selectedAccountId) {
+        setError('Please select an ad account');
+        return;
+      }
+    }
+
+    // Step 3: Campaign Details
+    if (currentStep === 3) {
       if (!campaignName || !objective || !goal) {
         setError('Campaign Name, Objective, and Goal are required');
         return;
       }
+
       if (!description || !startTime) {
         setError('Description and Start Time are required');
         return;
       }
-      // Currency and Budget are always selected due to defaults/dropdowns
     }
 
-    // Step 3: Assets (Moved from Step 2)
-    if (currentStep === 3) {
+    // Step 4: Assets
+    if (currentStep === 4) {
       if (assetType === 'catalog') {
         if (!selectedCatalogId) {
           setError('Please select a catalog');
@@ -229,7 +277,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
       }
     }
 
-    if (currentStep === 4) {
+    if (currentStep === 5) {
       if (!selectedPageId) {
         setError('Page selection is required');
         return;
@@ -237,14 +285,33 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
     }
 
     setError('');
-    if (currentStep < 5) {
-      setCurrentStep((currentStep + 1) as Step);
+    setError('');
+    if (currentStep < 6) {
+      if (currentStep === 1) {
+        // If Manager, go to Step 2 (Account), else skip to Step 3 (Details)
+        if (isManagerPlanUser(user?.email)) {
+          setCurrentStep(2);
+        } else {
+          setCurrentStep(3);
+        }
+      } else {
+        setCurrentStep((currentStep + 1) as Step);
+      }
     }
   };
 
   const handleBack = () => {
     if (currentStep > 1) {
-      setCurrentStep((currentStep - 1) as Step);
+      if (currentStep === 3) {
+        // If Manager, go back to Step 2, else skip back to Step 1
+        if (isManagerPlanUser(user?.email)) {
+          setCurrentStep(2);
+        } else {
+          setCurrentStep(1);
+        }
+      } else {
+        setCurrentStep((currentStep - 1) as Step);
+      }
     }
   };
 
@@ -376,6 +443,12 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
         webhookPayload.Offer = offer;
       }
 
+      // Manager Plan: Add Account Info
+      if (isManagerPlanUser(user.email) && selectedAccountId) {
+        webhookPayload.account_id = selectedAccountId;
+        webhookPayload.account_name = selectedAccountName;
+      }
+
       console.log('Sending campaign to webhook:', webhookPayload);
       console.log('Payload Files:', webhookPayload.files);
 
@@ -428,7 +501,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
             }`}
         >
           <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            New Campaign - Step {currentStep} of 5
+            New Campaign - Step {currentStep} of 6
           </h2>
           <button
             onClick={onClose}
@@ -530,9 +603,50 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
             </div>
           )}
 
-          {/* STEP 2: Campaign Details */}
-          {currentStep === 2 && (
+          {/* STEP 2: Account Selection (Manager Only) */}
+          {currentStep === 2 && isManagerPlanUser(user?.email) && (
             <div className="space-y-6">
+              <div className="mb-6">
+                {accounts.length > 0 ? (
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      Ad Account *
+                    </label>
+                    <select
+                      value={selectedAccountId}
+                      onChange={(e) => {
+                        const account = accounts.find(a => a.account_id === e.target.value);
+                        setSelectedAccountId(e.target.value);
+                        setSelectedAccountName(account?.account_name || '');
+                      }}
+                      className={`w-full px-4 py-3 rounded-xl border ${theme === 'dark'
+                        ? 'bg-gray-700 border-gray-600 text-white'
+                        : 'bg-white border-gray-300 text-gray-900'
+                        } focus:ring-2 focus:ring-blue-500 focus:outline-none`}
+                    >
+                      <option value="">Select Ad Account</option>
+                      {accounts.map((acc) => (
+                        <option key={acc.id} value={acc.account_id}>
+                          {acc.account_name} ({acc.account_id})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-yellow-900/20 border-yellow-800' : 'bg-yellow-50 border-yellow-200'}`}>
+                    <p className={`text-sm ${theme === 'dark' ? 'text-yellow-200' : 'text-yellow-800'}`}>
+                      ⚠️ No connected ad accounts found. Please connect accounts from the dashboard first.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: Campaign Details */}
+          {currentStep === 3 && (
+            <div className="space-y-6">
+
               <div>
                 <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                   Campaign Name *
@@ -696,8 +810,8 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
             </div>
           )}
 
-          {/* STEP 3: Assets - Catalog */}
-          {currentStep === 3 && assetType === 'catalog' && (
+          {/* STEP 4: Assets - Catalog */}
+          {currentStep === 4 && assetType === 'catalog' && (
             <div className="space-y-6">
               <div>
                 <label className={`block text-sm font-medium mb-3 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
@@ -734,8 +848,8 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
             </div>
           )}
 
-          {/* STEP 3: Assets - Upload */}
-          {currentStep === 3 && assetType === 'upload' && (
+          {/* STEP 4: Assets - Upload */}
+          {currentStep === 4 && assetType === 'upload' && (
             <div className="space-y-6">
               <div>
                 <label className={`block text-sm font-medium mb-3 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
@@ -849,8 +963,8 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
             </div>
           )}
 
-          {/* STEP 4: Page Selection */}
-          {currentStep === 4 && (
+          {/* STEP 5: Page Selection */}
+          {currentStep === 5 && (
             <div className="space-y-6">
               <div>
                 <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
@@ -879,8 +993,8 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
             </div>
           )}
 
-          {/* STEP 5: Review */}
-          {currentStep === 5 && (
+          {/* STEP 6: Review */}
+          {currentStep === 6 && (
             <div className="space-y-4">
               <h3 className={`text-xl font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                 Review Campaign
@@ -965,14 +1079,14 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
 
           {!loading && (
             <button
-              onClick={currentStep === 5 ? handleSubmit : handleNext}
+              onClick={currentStep === 6 ? handleSubmit : handleNext}
               disabled={loading}
               className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg shadow-blue-500/20 ${loading
                 ? 'bg-blue-400 cursor-not-allowed'
                 : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white transform hover:scale-[1.02]'
                 }`}
             >
-              {currentStep === 5 ? 'Create Campaign' : 'Next Step'}
+              {currentStep === 6 ? 'Create Campaign' : 'Next Step'}
             </button>
           )}
         </div>
