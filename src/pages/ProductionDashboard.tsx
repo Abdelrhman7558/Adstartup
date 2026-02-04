@@ -308,7 +308,7 @@ export default function ProductionDashboard() {
               </button>
 
               {/* For Manager users: Always show Connect Meta button */}
-              {isManagerPlanUser(user?.email) && !trialExpired && (
+              {isManagerPlanUser(user?.email) && (
                 <button
                   onClick={handleConnectMeta}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
@@ -327,7 +327,7 @@ export default function ProductionDashboard() {
                 </button>
               )}
 
-              {!isMetaConnected && trialExpired && (
+              {!isManagerPlanUser(user?.email) && !isMetaConnected && trialExpired && (
                 <div className="px-4 py-2 bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
                   <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">Trial Expired</p>
                   <p className="text-xs text-gray-500 dark:text-gray-500">Subscribe to connect Meta</p>

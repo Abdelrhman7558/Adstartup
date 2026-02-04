@@ -110,6 +110,14 @@ export default function UserMenu() {
           {initials}
         </div>
         <div className="hidden sm:flex flex-col items-start">
+          {(() => {
+            console.log('UserMenu Debug:', {
+              email: user?.email,
+              isManager: isManagerPlanUser(user?.email),
+              trialInfo
+            });
+            return null;
+          })()}
           <span className="text-sm">{firstName}</span>
           {trialInfo && !trialInfo.trial_expired && !isManagerPlanUser(user?.email) && (
             <span className="text-xs text-green-400">
