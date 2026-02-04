@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { hasActiveSubscription } from '../lib/subscriptionService';
 import { trialService } from '../lib/trialService';
+import { isManagerPlanUser } from '../lib/managerPlanService';
 import { Loader } from 'lucide-react';
 
 interface SubscriptionProtectedRouteProps {
@@ -30,7 +31,14 @@ export default function SubscriptionProtectedRoute({ children }: SubscriptionPro
     }
 
     try {
-      // Check if user has active subscription first
+      // Check if user is Manager plan (always has access)
+      if (isManagerPlanUser(user.email)) {
+        setHasAccess(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if user has active subscription
       const hasSub = await hasActiveSubscription(user.id);
       if (hasSub) {
         setHasAccess(true);

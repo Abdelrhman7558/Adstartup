@@ -14,8 +14,10 @@ import NewCampaignModal from '../components/dashboard/NewCampaignModal';
 import NotificationsDropdown from '../components/NotificationsDropdown';
 import CountrySelector from '../components/CountrySelector';
 import SupportChatbot from '../components/SupportChatbot';
+import MultipleMetaAccountsDropdown from '../components/MultipleMetaAccountsDropdown';
 import { supabase } from '../lib/supabase';
 import { fetchDashboardData, DashboardData } from '../lib/dashboardDataService';
+import { isManagerPlanUser } from '../lib/managerPlanService';
 type View = 'home' | 'assets' | 'insights' | 'campaigns' | 'active-ads';
 
 export default function ProductionDashboard() {
@@ -305,7 +307,18 @@ export default function ProductionDashboard() {
                 <RefreshCw className={`w-5 h-5 ${isLoadingDashboard ? 'animate-spin' : ''}`} />
               </button>
 
-              {!isMetaConnected && !trialExpired && (
+              {/* For Manager users: Always show Connect Meta button */}
+              {isManagerPlanUser(user?.email) && !trialExpired && (
+                <button
+                  onClick={handleConnectMeta}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                >
+                  Connect Meta
+                </button>
+              )}
+
+              {/* For non-Manager users: Only show when not connected */}
+              {!isManagerPlanUser(user?.email) && !isMetaConnected && !trialExpired && (
                 <button
                   onClick={handleConnectMeta}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
@@ -321,7 +334,8 @@ export default function ProductionDashboard() {
                 </div>
               )}
 
-              {isMetaConnected && (
+              {/* For non-Manager users: Show connected badge */}
+              {!isManagerPlanUser(user?.email) && isMetaConnected && (
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900 rounded-lg">
                   <div className="w-2 h-2 bg-green-600 rounded-full"></div>
                   <span className="text-sm font-medium text-green-900 dark:text-green-100">
@@ -329,6 +343,9 @@ export default function ProductionDashboard() {
                   </span>
                 </div>
               )}
+
+              {/* Manager Plan: Multiple accounts dropdown */}
+              <MultipleMetaAccountsDropdown />
 
               <NotificationsDropdown />
             </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { RefreshCw, Trash2, AlertCircle, FolderOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { isManagerPlanUser } from '../../lib/managerPlanService';
 
 interface Campaign {
   campaign_id: string;
@@ -13,6 +14,7 @@ interface Campaign {
   revenue?: number;
   date_start?: string;
   date_stop?: string;
+  account_name?: string; // For Manager plan users
 }
 
 export default function CampaignsListView() {
@@ -21,6 +23,9 @@ export default function CampaignsListView() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Check if user is Manager plan
+  const isManager = isManagerPlanUser(user?.email);
 
   const fetchCampaigns = async () => {
     if (!user) return;
@@ -112,11 +117,10 @@ export default function CampaignsListView() {
               return (
                 <div
                   key={campaign.campaign_id}
-                  className={`p-6 rounded-xl border ${
-                    theme === 'dark'
+                  className={`p-6 rounded-xl border ${theme === 'dark'
                       ? 'bg-gray-800 border-gray-700'
                       : 'bg-white border-gray-200'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -125,13 +129,12 @@ export default function CampaignsListView() {
                           {campaign.campaign_name}
                         </h3>
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            campaign.status === 'active'
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${campaign.status === 'active'
                               ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                               : campaign.status === 'paused'
-                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                              : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
-                          }`}
+                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
+                            }`}
                         >
                           {campaign.status}
                         </span>
@@ -146,6 +149,18 @@ export default function CampaignsListView() {
                             {campaign.campaign_id}
                           </p>
                         </div>
+
+                        {/* Account - Only for Manager plan */}
+                        {isManager && (
+                          <div>
+                            <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                              Account
+                            </p>
+                            <p className={`font-medium ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+                              {campaign.account_name || '--'}
+                            </p>
+                          </div>
+                        )}
 
                         <div>
                           <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>

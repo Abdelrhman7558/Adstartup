@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, LayoutDashboard, ChevronDown, Copy, Check, Settings, HelpCircle, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { isManagerPlanUser } from '../lib/managerPlanService';
 
 interface TrialInfo {
   trial_end_at: string;
@@ -145,16 +146,14 @@ export default function UserMenu() {
             ) : (
               <div className="mt-2 flex items-center gap-2">
                 <span
-                  className={`w-2 h-2 rounded-full ${
-                    isSubscribed ? 'bg-green-500' : 'bg-gray-500'
-                  }`}
+                  className={`w-2 h-2 rounded-full ${isManagerPlanUser(user?.email) ? 'bg-purple-500' : isSubscribed ? 'bg-green-500' : 'bg-gray-500'
+                    }`}
                 />
                 <span
-                  className={`text-xs font-medium ${
-                    isSubscribed ? 'text-green-400' : 'text-gray-500'
-                  }`}
+                  className={`text-xs font-medium ${isManagerPlanUser(user?.email) ? 'text-purple-400' : isSubscribed ? 'text-green-400' : 'text-gray-500'
+                    }`}
                 >
-                  Plan: {isSubscribed ? 'Active' : 'Free'}
+                  Plan: {isManagerPlanUser(user?.email) ? 'Manager' : isSubscribed ? 'Active' : 'Free'}
                 </span>
               </div>
             )}
@@ -186,8 +185,8 @@ export default function UserMenu() {
               <span>Account Settings</span>
             </button>
 
-            {/* Dashboard Link - Only if subscribed */}
-            {isSubscribed && (
+            {/* Dashboard Link - Show if subscribed OR Manager plan user */}
+            {(isSubscribed || isManagerPlanUser(user?.email)) && (
               <button
                 onClick={handleDashboard}
                 className="w-full px-4 py-2 text-left text-gray-300 hover:bg-gray-800 hover:text-white transition-colors flex items-center gap-3"

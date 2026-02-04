@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { fetchActiveCampaigns } from '../../lib/n8nWebhookService';
 import { formatCurrency } from '../../lib/currencyUtils';
+import { isManagerPlanUser } from '../../lib/managerPlanService';
 
 interface ActiveCampaign {
   campaign_name: string;
@@ -19,6 +20,7 @@ interface ActiveCampaign {
   cpa: number;
   start_date: string | null;
   end_date: string | null;
+  account_name?: string; // For Manager plan users
 }
 
 export default function ActiveAdsView() {
@@ -27,6 +29,9 @@ export default function ActiveAdsView() {
   const [activeCampaigns, setActiveCampaigns] = useState<ActiveCampaign[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Check if user is Manager plan
+  const isManager = isManagerPlanUser(user?.email);
 
   const loadActiveCampaigns = async () => {
     if (!user) return;
@@ -100,6 +105,9 @@ export default function ActiveAdsView() {
               <thead>
                 <tr className={`border-b ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
                   <th className={`p-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Name</th>
+                  {isManager && (
+                    <th className={`p-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Account</th>
+                  )}
                   <th className={`p-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>ID</th>
                   <th className={`p-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Budget</th>
                   <th className={`p-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Spend</th>
@@ -123,6 +131,11 @@ export default function ActiveAdsView() {
                     <td className={`p-4 font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                       {campaign.campaign_name || 'Unnamed'}
                     </td>
+                    {isManager && (
+                      <td className={`p-4 text-sm ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+                        {campaign.account_name || '--'}
+                      </td>
+                    )}
                     <td className={`p-4 text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                       {campaign.campaign_id || '--'}
                     </td>
