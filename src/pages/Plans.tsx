@@ -131,11 +131,10 @@ export default function Plans() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
-              className={`relative bg-gray-900 border-2 rounded-2xl p-8 ${
-                plan.popular
+              className={`relative bg-gray-900 border-2 rounded-2xl p-8 ${plan.popular
                   ? 'border-red-600 shadow-2xl shadow-red-600/20'
                   : 'border-gray-800 hover:border-gray-700'
-              } transition-all duration-300`}
+                } transition-all duration-300`}
             >
               {plan.popular && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
@@ -165,11 +164,10 @@ export default function Plans() {
               <button
                 onClick={() => handleSelectPlan(plan.id)}
                 disabled={loading && selectedPlan === plan.id}
-                className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
-                  plan.popular
+                className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${plan.popular
                     ? 'bg-red-600 hover:bg-red-700 text-white'
                     : 'bg-gray-800 hover:bg-gray-700 text-white'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {loading && selectedPlan === plan.id ? (
                   <>
@@ -193,7 +191,7 @@ export default function Plans() {
           transition={{ duration: 0.6, delay: 0.4 }}
           className="text-center mt-16 text-gray-400"
         >
-          <p>All plans include a 14-day free trial. Cancel anytime.</p>
+          <p>All plans include a 7-day free trial. Cancel anytime.</p>
         </motion.div>
       </div>
     </div>
