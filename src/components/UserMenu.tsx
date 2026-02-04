@@ -111,7 +111,7 @@ export default function UserMenu() {
         </div>
         <div className="hidden sm:flex flex-col items-start">
           <span className="text-sm">{firstName}</span>
-          {trialInfo && !trialInfo.trial_expired && (
+          {trialInfo && !trialInfo.trial_expired && !isManagerPlanUser(user?.email) && (
             <span className="text-xs text-green-400">
               {trialInfo.remaining_days}d trial
             </span>
@@ -126,7 +126,14 @@ export default function UserMenu() {
           <div className="px-4 py-3 border-b border-gray-800">
             <p className="text-sm font-semibold text-white">{profile?.full_name || 'User'}</p>
             <p className="text-xs text-gray-400 truncate">{user?.email}</p>
-            {trialInfo && trialInfo.trial_expired ? (
+            {isManagerPlanUser(user?.email) ? (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple-500" />
+                <span className="text-xs font-medium text-purple-400">
+                  Plan: Manager
+                </span>
+              </div>
+            ) : trialInfo && trialInfo.trial_expired ? (
               <div className="mt-3 flex items-start gap-2 p-2 bg-red-500/10 border border-red-500/20 rounded">
                 <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                 <div>
@@ -146,14 +153,12 @@ export default function UserMenu() {
             ) : (
               <div className="mt-2 flex items-center gap-2">
                 <span
-                  className={`w-2 h-2 rounded-full ${isManagerPlanUser(user?.email) ? 'bg-purple-500' : isSubscribed ? 'bg-green-500' : 'bg-gray-500'
-                    }`}
+                  className={`w-2 h-2 rounded-full ${isSubscribed ? 'bg-green-500' : 'bg-gray-500'}`}
                 />
                 <span
-                  className={`text-xs font-medium ${isManagerPlanUser(user?.email) ? 'text-purple-400' : isSubscribed ? 'text-green-400' : 'text-gray-500'
-                    }`}
+                  className={`text-xs font-medium ${isSubscribed ? 'text-green-400' : 'text-gray-500'}`}
                 >
-                  Plan: {isManagerPlanUser(user?.email) ? 'Manager' : isSubscribed ? 'Active' : 'Free'}
+                  Plan: {isSubscribed ? 'Active' : 'Free'}
                 </span>
               </div>
             )}
