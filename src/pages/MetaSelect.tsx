@@ -38,8 +38,8 @@ export default function MetaSelect() {
   const { user, session } = useAuth();
   const [searchParams] = useSearchParams();
   const rawUserId = searchParams.get('user_id') || user?.id;
-  // Ensure we use the clean UUID for fetching data, stripping any legacy suffixes
-  const userId = rawUserId?.includes('__') ? rawUserId.split('__')[0] : rawUserId;
+  // Robust: Split by ANY underscore to ensure we get clean UUID (UUIDs use hyphens, not underscores)
+  const userId = rawUserId?.includes('_') ? rawUserId.split('_')[0] : rawUserId;
 
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [pages, setPages] = useState<Page[]>([]);
@@ -57,14 +57,25 @@ export default function MetaSelect() {
   const [submitting, setSubmitting] = useState(false);
   const [countdown, setCountdown] = useState(0);
 
+  // Debug: Log the effective ID
+  useEffect(() => {
+    console.log('[MetaSelect] Initialized with Raw:', rawUserId, 'Clean:', userId);
+  }, [rawUserId, userId]);
+
   if (!userId) {
-    navigate('/signin');
-    return null;
+    // If we truly have no ID, go to sign in.
+    // But check if we are just waiting for auth
+    if (!user && !rawUserId) {
+      navigate('/signin');
+      return null;
+    }
   }
 
   useEffect(() => {
-    fetchAllData();
-  }, []);
+    if (userId) {
+      fetchAllData();
+    }
+  }, [userId]); // Dependency added!
 
   const fetchAllData = async (attempt = 0) => {
     setLoading(true);
