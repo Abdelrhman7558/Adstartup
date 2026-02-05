@@ -314,7 +314,7 @@ export default function ProductionDashboard() {
               </button>
 
               {/* For Manager users: Always show Connect Meta button */}
-              {(isManagerPlanUser(user?.email) || ['jihadalcc@gmail.com', '7bd02025@gmail.com'].includes(user?.email?.toLowerCase() || '')) && (
+              {isManagerPlanUser(user?.email) && (
                 <button
                   onClick={handleConnectMeta}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"

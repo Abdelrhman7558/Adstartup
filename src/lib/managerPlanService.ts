@@ -15,8 +15,14 @@ const MANAGER_PLAN_EMAILS = [
  * Check if a user has Manager plan based on their email
  */
 export function isManagerPlanUser(email: string | undefined | null): boolean {
-    if (!email) return false;
-    return MANAGER_PLAN_EMAILS.includes(email.trim().toLowerCase() as typeof MANAGER_PLAN_EMAILS[number]);
+    if (!email) {
+        console.log('[ManagerPlan] Check failed: No email provided');
+        return false;
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    const isManager = MANAGER_PLAN_EMAILS.includes(normalizedEmail as typeof MANAGER_PLAN_EMAILS[number]);
+    console.log(`[ManagerPlan] Checking email: "${email}" (normalized: "${normalizedEmail}") -> Is Manager: ${isManager}`);
+    return isManager;
 }
 
 /**
