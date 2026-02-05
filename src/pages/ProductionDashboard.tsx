@@ -21,7 +21,7 @@ import { isManagerPlanUser } from '../lib/managerPlanService';
 type View = 'home' | 'assets' | 'insights' | 'campaigns' | 'active-ads';
 
 export default function ProductionDashboard() {
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [currentView, setCurrentView] = useState<View>('home');
@@ -45,10 +45,16 @@ export default function ProductionDashboard() {
       loadDashboardData();
       checkTrialStatus();
     }
-  }, [user]);
+  }, [user, profile]); // Add profile dependency
 
   const loadUserData = async () => {
     if (!user) return;
+
+    // Use profile name if available, otherwise fetch or fallback
+    if (profile?.full_name) {
+      setDisplayName(profile.full_name);
+      return;
+    }
 
     const { data, error } = await supabase
       .from('users')
