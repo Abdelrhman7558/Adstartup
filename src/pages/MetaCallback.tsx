@@ -45,7 +45,11 @@ export default function MetaCallback() {
       }
 
       // Validate user_id from state parameter
-      if (state !== user?.id) {
+      // Allow exact match OR match with __manager suffix
+      const isManagerConnection = state?.endsWith('__manager');
+      const cleanStateUserId = isManagerConnection ? state?.split('__')[0] : state;
+
+      if (cleanStateUserId !== user?.id) {
         setErrorMsg('Security validation failed. Please reconnect your account.');
         setStatus('error');
         logWebhookCall('POST', 'Meta-Callback', state || 'MISSING', false, { reason: 'state_mismatch' });
@@ -106,7 +110,9 @@ export default function MetaCallback() {
 
       setStatus('success');
       setTimeout(() => {
-        navigate(`/meta-select?user_id=${validatedUserId}`);
+        // Redirect with clean user_id and mode flag if applicable
+        const isManager = state?.endsWith('__manager');
+        navigate(`/meta-select?user_id=${validatedUserId}${isManager ? '&mode=manager' : ''}`);
       }, 1500);
     } catch (error: any) {
       console.error('[MetaCallback] Error:', {

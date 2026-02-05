@@ -37,7 +37,9 @@ export default function MetaSelect() {
   const navigate = useNavigate();
   const { user, session } = useAuth();
   const [searchParams] = useSearchParams();
-  const userId = searchParams.get('user_id') || user?.id;
+  const rawUserId = searchParams.get('user_id') || user?.id;
+  // Ensure we use the clean UUID for fetching data, stripping any legacy suffixes
+  const userId = rawUserId?.includes('__') ? rawUserId.split('__')[0] : rawUserId;
 
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [pages, setPages] = useState<Page[]>([]);
