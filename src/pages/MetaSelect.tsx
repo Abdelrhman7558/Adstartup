@@ -34,12 +34,20 @@ interface Page {
 type Step = 1 | 2 | 3 | 4 | 5;
 
 export default function MetaSelect() {
+  // DEBUG: Log immediately on component render
+  console.log('[MetaSelect] Component rendering at:', window.location.href);
+
   const navigate = useNavigate();
   const { user, session } = useAuth();
   const [searchParams] = useSearchParams();
+
+  // DEBUG: Log all search params
+  console.log('[MetaSelect] Search params:', Object.fromEntries(searchParams.entries()));
   const rawUserId = searchParams.get('user_id') || user?.id;
   // Robust: Split by ANY underscore to ensure we get clean UUID (UUIDs use hyphens, not underscores)
   const userId = rawUserId?.includes('_') ? rawUserId.split('_')[0] : rawUserId;
+
+
 
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [pages, setPages] = useState<Page[]>([]);
@@ -89,17 +97,22 @@ export default function MetaSelect() {
     }
   }, [userId]);
 
-  // RENDER DEBUG OVERLAY
-  const DebugOverlay = () => (
-    <div className="fixed bottom-4 right-4 p-4 bg-black bg-opacity-90 border border-gray-700 rounded-lg text-xs font-mono text-green-400 z-50 max-w-sm overflow-hidden pointer-events-none opacity-50 hover:opacity-100">
-      <p>Raw ID: {rawUserId || 'null'}</p>
-      <p>Clean ID: {userId || 'null'}</p>
-      <p>Loading: {loading ? 'true' : 'false'}</p>
-      <p>Error: {error || 'null'}</p>
-      <p>Pages: {pages?.length || 0}</p>
-      <p>Accounts: {adAccounts?.length || 0}</p>
-    </div>
-  );
+  // RENDER DEBUG OVERLAY - Only show in development mode
+  const DebugOverlay = () => {
+    // Hide debug overlay in production
+    if (!import.meta.env.DEV) return null;
+
+    return (
+      <div className="fixed bottom-4 right-4 p-4 bg-black bg-opacity-90 border border-gray-700 rounded-lg text-xs font-mono text-green-400 z-50 max-w-sm overflow-hidden pointer-events-none opacity-50 hover:opacity-100">
+        <p>Raw ID: {rawUserId || 'null'}</p>
+        <p>Clean ID: {userId || 'null'}</p>
+        <p>Loading: {loading ? 'true' : 'false'}</p>
+        <p>Error: {error || 'null'}</p>
+        <p>Pages: {pages?.length || 0}</p>
+        <p>Accounts: {adAccounts?.length || 0}</p>
+      </div>
+    );
+  };
 
   const fetchAllData = async (attempt = 0) => {
     setLoading(true);
@@ -151,7 +164,7 @@ export default function MetaSelect() {
     try {
       const validatedUserId = validateUserId(userId || undefined);
 
-      const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook-test/get-pages', {
+      const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: validatedUserId }),
@@ -189,7 +202,7 @@ export default function MetaSelect() {
     try {
       const validatedUserId = validateUserId(userId || undefined);
 
-      const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook-test/get-ad-accounts', {
+      const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/meta-ad-accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: validatedUserId }),
@@ -227,7 +240,7 @@ export default function MetaSelect() {
     try {
       const validatedUserId = validateUserId(userId || undefined);
 
-      const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook-test/get-pixels', {
+      const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/meta-all-pixels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: validatedUserId, ad_account_id: selectedAdAccount || '' }),
@@ -265,7 +278,7 @@ export default function MetaSelect() {
     try {
       const validatedUserId = validateUserId(userId || undefined);
 
-      const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook-test/get-catalogs', {
+      const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/meta-all-catalogs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: validatedUserId }),
@@ -437,7 +450,7 @@ export default function MetaSelect() {
             <p className="text-[10px] text-gray-600 mt-4 uppercase tracking-widest">Tip: Ensure n8n workflow is set to "Wait for response"</p>
           </div>
         ) : (
-          items.map((item: any) => (
+          (items || []).map((item: any) => (
             <motion.button
               key={item.id}
               initial={{ opacity: 0, x: -20 }}

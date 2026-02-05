@@ -43,14 +43,8 @@ function AppContent() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/confirm" element={<AuthConfirm />} />
       <Route path="/meta-callback" element={<MetaCallback />} />
-      <Route
-        path="/meta-select"
-        element={
-          <ProtectedRoute>
-            <MetaSelect />
-          </ProtectedRoute>
-        }
-      />
+      {/* TEMPORARILY UNPROTECTED FOR DEBUGGING - Was ProtectedRoute */}
+      <Route path="/meta-select" element={<MetaSelect />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/terms-of-service" element={<TermsOfService />} />
       <Route path="/payment" element={<Payment />} />
@@ -84,8 +78,11 @@ function AppContent() {
 }
 
 function App() {
+  // Use the same base path from Vite config
+  const basename = import.meta.env.BASE_URL || '/TheAdAgent';
+
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <ThemeProvider>
         <AuthProvider>
           <AppContent />

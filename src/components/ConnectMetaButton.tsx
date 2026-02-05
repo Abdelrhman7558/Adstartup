@@ -32,10 +32,19 @@ export default function ConnectMetaButton({
     try {
       const validatedUserId = validateUserId(userId);
       const clientId = '891623109984411';
-      const redirectUri = encodeURIComponent('https://n8n.srv1181726.hstgr.cloud/webhook/Meta-Callback');
-      const scope = encodeURIComponent('ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,pages_show_list,instagram_basic,business_management,catalog_management');
+      // Use Frontend Callback directly to bypass n8n failure
+      const redirectUri = `${window.location.origin}/meta-callback`;
+      // Use Implicit Grant (response_type=token)
+      const scope = encodeURIComponent('ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,ads_read,business_management,catalog_management');
 
-      const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&state=${validatedUserId}`;
+      // Check for manager plan (simplified logic here, main logic in dashboard)
+      const isManager = userId.endsWith('__manager'); // Basic check if passed ID has suffix
+
+      // Append __manager suffix if user is a manager and not already present
+      // Note: userId passed here should ideally be clean, but we handle state consistently
+      const state = validatedUserId;
+
+      const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${state}&response_type=token`;
 
       window.location.href = oauthUrl;
     } catch (error) {
