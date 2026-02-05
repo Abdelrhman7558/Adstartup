@@ -148,7 +148,8 @@ export default function ProductionDashboard() {
     }
 
     const clientId = '891623109984411';
-    const redirectUri = 'https://n8n.srv1181726.hstgr.cloud/webhook/Meta-Callback';
+    // Use Frontend Callback directly to bypass n8n failure
+    const redirectUri = `${window.location.origin}/meta-callback`;
     const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,ads_read,business_management,catalog_management';
 
     // Check for manager plan
@@ -158,9 +159,10 @@ export default function ProductionDashboard() {
     // Append __manager suffix if user is a manager, to trigger multi-account logic in backend
     const state = isManager ? `${user.id}__manager` : user.id;
 
-    const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}`;
+    // Use Implicit Grant (response_type=token) to get token directly without Client Secret
+    const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}&response_type=token`;
 
-    console.log('Redirecting to Meta OAuth:', oauthUrl);
+    console.log('Redirecting to Meta OAuth (Implicit):', oauthUrl);
     window.location.href = oauthUrl;
   };
 

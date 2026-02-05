@@ -62,20 +62,44 @@ export default function MetaSelect() {
     console.log('[MetaSelect] Initialized with Raw:', rawUserId, 'Clean:', userId);
   }, [rawUserId, userId]);
 
-  if (!userId) {
-    // If we truly have no ID, go to sign in.
-    // But check if we are just waiting for auth
-    if (!user && !rawUserId) {
-      navigate('/signin');
-      return null;
+  // SAFETY TIMEOUT: Force stop loading after 15 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading) {
+        setLoading(false);
+        setError('Loading timed out. Please try refreshing.');
+      }
+    }, 15000);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  useEffect(() => {
+    // Validate ID asynchronously to avoid white-page render blocking
+    if (!userId && !loading) {
+      // Only redirect if we are sure we are done loading and truly have no ID
+      // navigate('/signin'); 
+      // For now, show error instead of redirecting to debug loop
+      setError('No User ID found. Please Sign In.');
     }
-  }
+  }, [userId, loading, navigate]);
 
   useEffect(() => {
     if (userId) {
       fetchAllData();
     }
-  }, [userId]); // Dependency added!
+  }, [userId]);
+
+  // RENDER DEBUG OVERLAY
+  const DebugOverlay = () => (
+    <div className="fixed bottom-4 right-4 p-4 bg-black bg-opacity-90 border border-gray-700 rounded-lg text-xs font-mono text-green-400 z-50 max-w-sm overflow-hidden pointer-events-none opacity-50 hover:opacity-100">
+      <p>Raw ID: {rawUserId || 'null'}</p>
+      <p>Clean ID: {userId || 'null'}</p>
+      <p>Loading: {loading ? 'true' : 'false'}</p>
+      <p>Error: {error || 'null'}</p>
+      <p>Pages: {pages?.length || 0}</p>
+      <p>Accounts: {adAccounts?.length || 0}</p>
+    </div>
+  );
 
   const fetchAllData = async (attempt = 0) => {
     setLoading(true);
@@ -480,6 +504,7 @@ export default function MetaSelect() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black p-6">
+      <DebugOverlay />
       <div className="max-w-2xl mx-auto">
         {/* Progress Bar */}
         <div className="mb-12">

@@ -16,9 +16,15 @@ export default function MetaCallback() {
 
   const handleCallback = async () => {
     try {
-      const code = searchParams.get('code');
-      const errorParam = searchParams.get('error');
-      const state = searchParams.get('state');
+      // HANDLE IMPLICIT FLOW (Token in Hash)
+      const hashParams = new URLSearchParams(window.location.hash.slice(1)); // Remove leading '#'
+      const accessToken = hashParams.get('access_token');
+      const state = hashParams.get('state') || searchParams.get('state'); // State might be in query or hash
+      const dataResId = hashParams.get('data_access_expiration_time'); // Check if it returned extra data
+
+      // HANDLE ERROR (Usually in Query)
+      const errorParam = searchParams.get('error') || hashParams.get('error');
+      const errorDesc = searchParams.get('error_description') || hashParams.get('error_description');
 
       if (errorParam === 'access_denied') {
         setErrorMsg('Meta connection was canceled. You can try again at any time.');
@@ -27,19 +33,16 @@ export default function MetaCallback() {
       }
 
       if (errorParam) {
-        const errorMap: { [key: string]: string } = {
-          invalid_request: "We couldn't complete the Meta connection. Please reconnect your account.",
-          invalid_scope: 'Meta permissions were not granted. Please try again.',
-          server_error: 'Failed to connect to Meta. Please try again or contact support.',
-        };
-
-        setErrorMsg(errorMap[errorParam] || "We couldn't complete the Meta connection. Please try again.");
+        console.error('Meta Auth Error:', errorParam, errorDesc);
+        setErrorMsg(errorDesc || "We couldn't complete the Meta connection. Please try again.");
         setStatus('error');
         return;
       }
 
-      if (!code || !state) {
-        setErrorMsg("We couldn't complete the Meta connection. Please reconnect your account.");
+      if (!accessToken && !state) {
+        // Only error if completely missing. 
+        // Note: Sometimes redirects might strip hash if not handled carefully, but standard Meta flow preserves it.
+        setErrorMsg("No connection data found. Please reconnect your account.");
         setStatus('error');
         return;
       }
@@ -58,37 +61,19 @@ export default function MetaCallback() {
 
       const validatedUserId = validateUserId(user?.id);
 
-      const tokenResponse = await fetch('https://graph.instagram.com/v19.0/oauth/access_token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: '891623109984411',
-          client_secret: import.meta.env.VITE_META_CLIENT_SECRET || '',
-          redirect_uri: 'https://n8n.srv1181726.hstgr.cloud/webhook/Meta-Callback',
-          code,
-        }).toString(),
-      });
-
-      if (!tokenResponse.ok) {
-        throw new Error('token_exchange_failed');
-      }
-
-      const tokenData = await tokenResponse.json();
-      const { access_token } = tokenData;
-
-      if (!access_token) {
-        throw new Error('no_access_token');
-      }
-
+      // Access Token is already here! No need to exchange code.
+      // Fetch User Details directly
       const meResponse = await fetch(
-        `https://graph.instagram.com/v19.0/me?fields=id,name,email,business&access_token=${access_token}`
+        `https://graph.instagram.com/v19.0/me?fields=id,name,email,business&access_token=${accessToken}`
       );
-      const meData = await meResponse.json();
 
       if (!meResponse.ok) {
+        const errData = await meResponse.json();
+        console.error('User Info Fetch Error:', errData);
         throw new Error('user_info_fetch_failed');
       }
 
+      const meData = await meResponse.json();
       const business_id = meData.business?.id || meData.id;
 
       await supabase
@@ -97,7 +82,7 @@ export default function MetaCallback() {
           {
             user_id: validatedUserId,
             business_id,
-            access_token,
+            access_token: accessToken, // Store the implicit token
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },
@@ -106,7 +91,7 @@ export default function MetaCallback() {
           }
         );
 
-      logWebhookCall('POST', 'Meta-Callback', validatedUserId, true, { business_id });
+      logWebhookCall('POST', 'Meta-Callback', validatedUserId, true, { business_id, method: 'implicit' });
 
       setStatus('success');
       setTimeout(() => {
@@ -122,17 +107,7 @@ export default function MetaCallback() {
 
       const errorCode = error.message || 'unknown_error';
 
-      try {
-        logWebhookCall('POST', 'Meta-Callback', user?.id || 'MISSING', false, { error: errorCode });
-      } catch {
-        // Silent fail on logging
-      }
-
-      if (error.message === 'token_exchange_failed') {
-        setErrorMsg('Failed to connect to Meta. Please try again or contact support.');
-      } else if (error.message === 'no_access_token') {
-        setErrorMsg('Failed to complete authorization. Please try reconnecting.');
-      } else if (error.message === 'user_info_fetch_failed') {
+      if (error.message === 'user_info_fetch_failed') {
         setErrorMsg('We could not access your Meta account details. Please try again.');
       } else {
         setErrorMsg('Network issue detected. Please check your connection and try again.');
