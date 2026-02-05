@@ -22,8 +22,15 @@ export default function MultipleMetaAccountsDropdown() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
+    // Manager Plan Whitelist - explicit check to ensure visibility
+    const MANAGER_EMAILS = ['jihadalcc@gmail.com', '7bd02025@gmail.com'];
+    const isManager = user?.email && (
+        MANAGER_EMAILS.includes(user.email.toLowerCase()) ||
+        isManagerPlanUser(user.email)
+    );
+
     // Only show for Manager plan users
-    if (!user || !isManagerPlanUser(user.email)) {
+    if (!user || !isManager) {
         return null;
     }
 
@@ -117,8 +124,8 @@ export default function MultipleMetaAccountsDropdown() {
                     if (!isOpen) loadAccounts();
                 }}
                 className={`p-2 rounded-lg transition-colors ${theme === 'dark'
-                        ? 'hover:bg-gray-700 text-gray-300'
-                        : 'hover:bg-gray-100 text-gray-700'
+                    ? 'hover:bg-gray-700 text-gray-300'
+                    : 'hover:bg-gray-100 text-gray-700'
                     }`}
                 title="Manage Meta Accounts"
             >
@@ -129,8 +136,8 @@ export default function MultipleMetaAccountsDropdown() {
             {isOpen && (
                 <div
                     className={`absolute right-0 top-full mt-2 w-80 rounded-xl border shadow-lg z-50 ${theme === 'dark'
-                            ? 'bg-gray-800 border-gray-700'
-                            : 'bg-white border-gray-200'
+                        ? 'bg-gray-800 border-gray-700'
+                        : 'bg-white border-gray-200'
                         }`}
                 >
                     {/* Header */}
@@ -171,8 +178,8 @@ export default function MultipleMetaAccountsDropdown() {
                                     <div
                                         key={account.id}
                                         className={`flex items-center justify-between px-4 py-3 ${theme === 'dark'
-                                                ? 'hover:bg-gray-700/50'
-                                                : 'hover:bg-gray-50'
+                                            ? 'hover:bg-gray-700/50'
+                                            : 'hover:bg-gray-50'
                                             }`}
                                     >
                                         <div className="flex-1 min-w-0">

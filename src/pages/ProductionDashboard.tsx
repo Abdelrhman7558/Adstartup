@@ -150,7 +150,13 @@ export default function ProductionDashboard() {
     const clientId = '891623109984411';
     const redirectUri = 'https://n8n.srv1181726.hstgr.cloud/webhook/Meta-Callback';
     const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,ads_read,business_management,catalog_management';
-    const state = user.id;
+
+    // Check for manager plan
+    const MANAGER_EMAILS = ['jihadalcc@gmail.com', '7bd02025@gmail.com'];
+    const isManager = MANAGER_EMAILS.includes(user.email?.toLowerCase() || '') || isManagerPlanUser(user.email);
+
+    // Append __manager suffix if user is a manager, to trigger multi-account logic in backend
+    const state = isManager ? `${user.id}__manager` : user.id;
 
     const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}`;
 
@@ -313,42 +319,55 @@ export default function ProductionDashboard() {
                 <RefreshCw className={`w-5 h-5 ${isLoadingDashboard ? 'animate-spin' : ''}`} />
               </button>
 
-              {/* For Manager users: Always show Connect Meta button */}
-              {isManagerPlanUser(user?.email) && (
-                <button
-                  onClick={handleConnectMeta}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
-                >
-                  Connect Meta
-                </button>
-              )}
+              {/* Access Control Logic */}
+              {(() => {
+                const MANAGER_EMAILS = ['jihadalcc@gmail.com', '7bd02025@gmail.com'];
+                const isManager = user?.email && (
+                  MANAGER_EMAILS.includes(user.email.toLowerCase()) ||
+                  isManagerPlanUser(user.email)
+                );
 
-              {/* For non-Manager users: Only show when not connected */}
-              {!isManagerPlanUser(user?.email) && !isMetaConnected && !trialExpired && (
-                <button
-                  onClick={handleConnectMeta}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
-                >
-                  Connect Meta
-                </button>
-              )}
+                return (
+                  <>
+                    {/* For Manager users: Always show Connect Meta button */}
+                    {isManager && (
+                      <button
+                        onClick={handleConnectMeta}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
+                      >
+                        Connect Meta
+                      </button>
+                    )}
 
-              {!isManagerPlanUser(user?.email) && !isMetaConnected && trialExpired && (
-                <div className="px-4 py-2 bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">Trial Expired</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500">Subscribe to connect Meta</p>
-                </div>
-              )}
+                    {/* For non-Manager users: Only show when not connected */}
+                    {!isManager && !isMetaConnected && !trialExpired && (
+                      <button
+                        onClick={handleConnectMeta}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                      >
+                        Connect Meta
+                      </button>
+                    )}
 
-              {/* For non-Manager users: Show connected badge */}
-              {!isManagerPlanUser(user?.email) && isMetaConnected && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900 rounded-lg">
-                  <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-                  <span className="text-sm font-medium text-green-900 dark:text-green-100">
-                    Meta Connected
-                  </span>
-                </div>
-              )}
+                    {!isManager && !isMetaConnected && trialExpired && (
+                      <div className="px-4 py-2 bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">Trial Expired</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500">Subscribe to connect Meta</p>
+                      </div>
+                    )}
+
+                    {/* For non-Manager users: Show connected badge */}
+                    {!isManager && isMetaConnected && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900 rounded-lg">
+                        <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                        <span className="text-sm font-medium text-green-900 dark:text-green-100">
+                          Meta Connected
+                        </span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Manager Plan: Multiple accounts dropdown */}
               <MultipleMetaAccountsDropdown />
