@@ -30,9 +30,25 @@ export default function SubscriptionProtectedRoute({ children }: SubscriptionPro
       return;
     }
 
+    console.log('[SubscriptionProtectedRoute] Checking access for:', user.email);
+
     try {
-      // Check if user is Manager plan (always has access)
+      // Explicitly whitelist Manager emails to prevent any service/import issues
+      const MANAGER_PLAN_EMAILS = [
+        'jihadalcc@gmail.com',
+        '7bd02025@gmail.com'
+      ];
+
+      if (user.email && MANAGER_PLAN_EMAILS.includes(user.email.toLowerCase())) {
+        console.log('[SubscriptionProtectedRoute] Manager Plan user detected. Access granted.');
+        setHasAccess(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Check service as backup
       if (isManagerPlanUser(user.email)) {
+        console.log('[SubscriptionProtectedRoute] isManagerPlanUser returned true. Access granted.');
         setHasAccess(true);
         setIsLoading(false);
         return;
@@ -55,6 +71,7 @@ export default function SubscriptionProtectedRoute({ children }: SubscriptionPro
       }
 
       // No active subscription or trial
+      console.log('[SubscriptionProtectedRoute] No active plan found. Access denied.');
       setHasAccess(false);
       setIsLoading(false);
     } catch (error) {
