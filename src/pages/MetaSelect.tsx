@@ -69,17 +69,19 @@ export default function MetaSelect() {
     setError(null);
     let isRetrying = false;
     try {
-      await Promise.all([
+      // Fetch all assets and get their "found" status
+      const [pagesFound, accountsFound, pixelsFound, catalogsFound] = await Promise.all([
         fetchPages(),
         fetchAdAccounts(),
         fetchPixels(),
         fetchCatalogs(),
       ]);
 
-      // Check if any of them are still empty/incomplete
-      const isIncomplete = pages.length === 0 && adAccounts.length === 0 && pixels.length === 0 && catalogs.length === 0;
+      // Check if ALL are empty (false returned)
+      // Note: We use the local variables, not state, to avoid closure staleness
+      const anyFound = pagesFound || accountsFound || pixelsFound || catalogsFound;
 
-      if (isIncomplete && attempt < 3) {
+      if (!anyFound && attempt < 3) {
         isRetrying = true;
         console.log(`⚠️ All assets empty on attempt ${attempt + 1}. Starting countdown for retry...`);
         let secondsLeft = 5;
@@ -108,7 +110,7 @@ export default function MetaSelect() {
     }
   };
 
-  const fetchPages = async () => {
+  const fetchPages = async (): Promise<boolean> => {
     try {
       const validatedUserId = validateUserId(userId || undefined);
 
@@ -126,8 +128,15 @@ export default function MetaSelect() {
         throw new Error('Pages not yet ready. Ensure n8n is set to "Respond to Webhook".');
       }
 
-      setPages(data.pages || []);
+      // STRICT ARRAY CHECK to prevent crashes
+      const pagesArray = Array.isArray(data.pages) ? data.pages : [];
+      if (data.pages && !Array.isArray(data.pages)) {
+        console.warn('Received non-array pages data:', data.pages);
+      }
+
+      setPages(pagesArray);
       logWebhookCall('POST', 'pages', validatedUserId, true);
+      return pagesArray.length > 0;
     } catch (err) {
       if (err instanceof WebhookValidationError) {
         console.error('[fetchPages] Validation error:', err.message);
@@ -135,10 +144,11 @@ export default function MetaSelect() {
         console.error('Error fetching pages:', err);
       }
       logWebhookCall('POST', 'pages', userId || 'MISSING', false, { error: String(err) });
+      return false;
     }
   };
 
-  const fetchAdAccounts = async () => {
+  const fetchAdAccounts = async (): Promise<boolean> => {
     try {
       const validatedUserId = validateUserId(userId || undefined);
 
@@ -156,8 +166,15 @@ export default function MetaSelect() {
         throw new Error('Ad Accounts not yet ready. Ensure n8n is set to "Respond to Webhook".');
       }
 
-      setAdAccounts(data.ad_accounts || []);
+      // STRICT ARRAY CHECK
+      const accountsArray = Array.isArray(data.ad_accounts) ? data.ad_accounts : [];
+      if (data.ad_accounts && !Array.isArray(data.ad_accounts)) {
+        console.warn('Received non-array ad_accounts data:', data.ad_accounts);
+      }
+
+      setAdAccounts(accountsArray);
       logWebhookCall('POST', 'meta-ad-accounts', validatedUserId, true);
+      return accountsArray.length > 0;
     } catch (err) {
       if (err instanceof WebhookValidationError) {
         console.error('[fetchAdAccounts] Validation error:', err.message);
@@ -165,10 +182,11 @@ export default function MetaSelect() {
         console.error('Error fetching ad accounts:', err);
       }
       logWebhookCall('POST', 'meta-ad-accounts', userId || 'MISSING', false, { error: String(err) });
+      return false;
     }
   };
 
-  const fetchPixels = async () => {
+  const fetchPixels = async (): Promise<boolean> => {
     try {
       const validatedUserId = validateUserId(userId || undefined);
 
@@ -186,8 +204,15 @@ export default function MetaSelect() {
         throw new Error('Pixels not yet ready. Ensure n8n is set to "Respond to Webhook".');
       }
 
-      setPixels(data.pixels || []);
+      // STRICT ARRAY CHECK
+      const pixelsArray = Array.isArray(data.pixels) ? data.pixels : [];
+      if (data.pixels && !Array.isArray(data.pixels)) {
+        console.warn('Received non-array pixels data:', data.pixels);
+      }
+
+      setPixels(pixelsArray);
       logWebhookCall('POST', 'meta-all-pixels', validatedUserId, true);
+      return pixelsArray.length > 0;
     } catch (err) {
       if (err instanceof WebhookValidationError) {
         console.error('[fetchPixels] Validation error:', err.message);
@@ -195,10 +220,11 @@ export default function MetaSelect() {
         console.error('Error fetching pixels:', err);
       }
       logWebhookCall('POST', 'meta-all-pixels', userId || 'MISSING', false, { error: String(err) });
+      return false;
     }
   };
 
-  const fetchCatalogs = async () => {
+  const fetchCatalogs = async (): Promise<boolean> => {
     try {
       const validatedUserId = validateUserId(userId || undefined);
 
@@ -216,8 +242,15 @@ export default function MetaSelect() {
         throw new Error('Catalogs not yet ready. Ensure n8n is set to "Respond to Webhook".');
       }
 
-      setCatalogs(data.catalogs || []);
+      // STRICT ARRAY CHECK
+      const catalogsArray = Array.isArray(data.catalogs) ? data.catalogs : [];
+      if (data.catalogs && !Array.isArray(data.catalogs)) {
+        console.warn('Received non-array catalogs data:', data.catalogs);
+      }
+
+      setCatalogs(catalogsArray);
       logWebhookCall('POST', 'meta-all-catalogs', validatedUserId, true);
+      return catalogsArray.length > 0;
     } catch (err) {
       if (err instanceof WebhookValidationError) {
         console.error('[fetchCatalogs] Validation error:', err.message);
@@ -225,6 +258,7 @@ export default function MetaSelect() {
         console.error('Error fetching catalogs:', err);
       }
       logWebhookCall('POST', 'meta-all-catalogs', userId || 'MISSING', false, { error: String(err) });
+      return false;
     }
   };
 
@@ -524,7 +558,7 @@ export default function MetaSelect() {
                   selected={selectedPage}
                   onSelect={setSelectedPage}
                   onClear={() => setSelectedPage(null)}
-                  isLoading={stepLoading}
+                  isLoading={loading}
                 />
               </motion.div>
             )}
@@ -542,7 +576,7 @@ export default function MetaSelect() {
                   selected={selectedAdAccount}
                   onSelect={setSelectedAdAccount}
                   onClear={() => setSelectedAdAccount(null)}
-                  isLoading={stepLoading}
+                  isLoading={loading}
                 />
               </motion.div>
             )}
@@ -560,7 +594,7 @@ export default function MetaSelect() {
                   selected={selectedPixel}
                   onSelect={setSelectedPixel}
                   onClear={() => setSelectedPixel(null)}
-                  isLoading={stepLoading}
+                  isLoading={loading}
                 />
               </motion.div>
             )}
@@ -578,7 +612,7 @@ export default function MetaSelect() {
                   selected={selectedCatalog}
                   onSelect={setSelectedCatalog}
                   onClear={() => setSelectedCatalog(null)}
-                  isLoading={stepLoading}
+                  isLoading={loading}
                 />
               </motion.div>
             )}
