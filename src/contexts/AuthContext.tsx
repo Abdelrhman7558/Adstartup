@@ -370,6 +370,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn('[SignUp] Step 3: WARNING - Could not verify user in database (non-critical):', checkError);
       }
 
+      if (!authData.user) return { error: new Error('No auth user'), data: null };
+
+      // Fallback: Manually insert into public.users if trigger failed
+      try {
+        const { data: dbUserCheck } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (!dbUserCheck) {
+          console.log('[SignUp] Step 3.5: Trigger likely failed. Manually inserting into public.users...');
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert({
+              id: userId,
+              email: email,
+              full_name: fullName || 'User', // Ensure partial profile data is present
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+
+          if (insertError) {
+            console.error('[SignUp] Step 3.5: Failed to manually insert user:', insertError);
+          } else {
+            console.log('[SignUp] Step 3.5: Manual insert successful.');
+          }
+        }
+      } catch (fallbackError) {
+        console.error('[SignUp] Step 3.5: Fallback insert crashed:', fallbackError);
+      }
+
       // Create profile (non-critical)
       console.log('[SignUp] Step 4: Creating profile...');
       try {

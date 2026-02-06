@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Check, ArrowRight, Zap } from 'lucide-react';
 import { useScrollAnimation } from '../hooks/useScrollAnimation';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,9 +12,14 @@ const Pricing = () => {
 
 
 
+  const [searchParams] = useSearchParams();
+
   const handleTrialClick = () => {
+    const params = new URLSearchParams(searchParams);
+    params.set('trial', 'true');
+
     if (!user) {
-      navigate('/signup?trial=true');
+      navigate(`/signup?${params.toString()}`);
     } else {
       navigate('/brief');
     }
