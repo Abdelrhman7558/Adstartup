@@ -1,5 +1,5 @@
 import { useState, FormEvent, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, CheckCircle, Mail } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,6 +8,7 @@ import logoNew from '../assets/logo-new.png';
 
 export default function SignUp() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { signUp, signInWithGoogle, user: authUser } = useAuth();
   const [loadingFlow, setLoadingFlow] = useState(false);
 
@@ -463,7 +464,7 @@ export default function SignUp() {
                   className="text-center text-sm text-gray-400"
                 >
                   Already have an account?{' '}
-                  <Link to="/signin" className="text-red-600 hover:text-red-500 transition-colors font-medium">
+                  <Link to={`/signin?${searchParams.toString()}`} className="text-red-600 hover:text-red-500 transition-colors font-medium">
                     Sign In
                   </Link>
                 </motion.p>

@@ -1,6 +1,8 @@
-export const PRODUCTION_DOMAIN = 'https://ad-startup.com';
+export const PRODUCTION_DOMAIN = 'https://the-adagent.com';
 
 export const ALLOWED_DOMAINS = [
+  'https://the-adagent.com',
+  'https://www.the-adagent.com',
   'https://ad-startup.com',
   'http://localhost:5173',
 ];

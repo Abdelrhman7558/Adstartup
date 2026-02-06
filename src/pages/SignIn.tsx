@@ -356,7 +356,7 @@ export default function SignIn() {
               className="text-center text-sm text-gray-400"
             >
               Don't have an account?{' '}
-              <Link to="/signup" className="text-red-600 hover:text-red-500 transition-colors font-medium">
+              <Link to={`/signup?${searchParams.toString()}`} className="text-red-600 hover:text-red-500 transition-colors font-medium">
                 Sign Up
               </Link>
             </motion.p>

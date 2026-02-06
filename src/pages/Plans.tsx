@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Check, Zap, ArrowRight } from 'lucide-react';
@@ -68,8 +68,20 @@ export default function Plans() {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Check for saved plan after sign in
+  useEffect(() => {
+    const savedPlan = localStorage.getItem('selectedPlan');
+    if (savedPlan && user?.id) {
+      // Clear saved plan and trigger selection
+      localStorage.removeItem('selectedPlan');
+      handleSelectPlan(savedPlan);
+    }
+  }, [user]);
+
   const handleSelectPlan = async (planId: string) => {
     if (!user?.id) {
+      // Store selected plan to restore after sign in
+      localStorage.setItem('selectedPlan', planId);
       navigate('/signin?redirect=/plans');
       return;
     }
@@ -132,8 +144,8 @@ export default function Plans() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
               className={`relative bg-gray-900 border-2 rounded-2xl p-8 ${plan.popular
-                  ? 'border-red-600 shadow-2xl shadow-red-600/20'
-                  : 'border-gray-800 hover:border-gray-700'
+                ? 'border-red-600 shadow-2xl shadow-red-600/20'
+                : 'border-gray-800 hover:border-gray-700'
                 } transition-all duration-300`}
             >
               {plan.popular && (
@@ -165,8 +177,8 @@ export default function Plans() {
                 onClick={() => handleSelectPlan(plan.id)}
                 disabled={loading && selectedPlan === plan.id}
                 className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${plan.popular
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : 'bg-gray-800 hover:bg-gray-700 text-white'
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : 'bg-gray-800 hover:bg-gray-700 text-white'
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {loading && selectedPlan === plan.id ? (
