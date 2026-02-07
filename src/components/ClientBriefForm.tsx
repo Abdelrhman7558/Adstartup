@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { createBriefVersion } from '../lib/briefService';
 
@@ -31,30 +30,11 @@ interface BriefFormData {
   shipping_info: string;
   refund_policy: string;
   social_proof: string[];
-  primary_goal: string;
-  secondary_goal: string;
-  funnel_stage: string;
-  campaign_type: string;
-  has_run_meta_ads: string;
-  monthly_ad_spend: string;
-  best_campaign_type: string;
-  best_creatives: string;
-  best_audience_type: string;
-  average_cpa: string;
-  average_roas: string;
-  past_issues: string;
   target_locations: string;
   age_range: string;
   gender: string;
   ideal_customer: string;
   interests_behaviors: string;
-  preferred_angles: string[];
-  competitors_to_avoid: string;
-  brand_guidelines: string;
-  ad_copy_tone: string;
-  daily_budget: string;
-  risk_tolerance: string;
-  campaign_launch: string;
 }
 
 const initialFormData: BriefFormData = {
@@ -83,30 +63,11 @@ const initialFormData: BriefFormData = {
   shipping_info: '',
   refund_policy: '',
   social_proof: [],
-  primary_goal: '',
-  secondary_goal: '',
-  funnel_stage: '',
-  campaign_type: '',
-  has_run_meta_ads: 'no',
-  monthly_ad_spend: '',
-  best_campaign_type: '',
-  best_creatives: '',
-  best_audience_type: '',
-  average_cpa: '',
-  average_roas: '',
-  past_issues: '',
   target_locations: '',
   age_range: '',
   gender: '',
   ideal_customer: '',
-  interests_behaviors: '',
-  preferred_angles: [],
-  competitors_to_avoid: '',
-  brand_guidelines: '',
-  ad_copy_tone: '',
-  daily_budget: '',
-  risk_tolerance: '',
-  campaign_launch: ''
+  interests_behaviors: ''
 };
 
 interface ClientBriefFormProps {
@@ -123,11 +84,7 @@ export default function ClientBriefForm({ onComplete }: ClientBriefFormProps) {
   const sections = [
     'Business & Brand Context',
     'Offer & Product Details',
-    'Marketing Objective',
-    'Historical Data',
-    'Target Audience',
-    'Creative Direction',
-    'Budget & Timeline'
+    'Target Audience'
   ];
 
   const handleInputChange = (field: keyof BriefFormData, value: string | string[]) => {
@@ -147,23 +104,15 @@ export default function ClientBriefForm({ onComplete }: ClientBriefFormProps) {
     switch (section) {
       case 0:
         return !!(formData.business_name && formData.business_type && formData.industry_niche &&
-                  formData.operating_countries && formData.selling_languages && formData.business_model &&
-                  formData.business_age && formData.usp && formData.brand_tone.length > 0 && formData.restricted_content);
+          formData.operating_countries && formData.selling_languages && formData.business_model &&
+          formData.business_age && formData.usp && formData.brand_tone.length > 0 && formData.restricted_content);
       case 1:
         return !!(formData.advertising_what && formData.product_description && formData.currency &&
-                  formData.aov && formData.offer_type && formData.payment_methods.length > 0 &&
-                  formData.shipping_info && formData.refund_policy && formData.social_proof.length > 0);
+          formData.aov && formData.offer_type && formData.payment_methods.length > 0 &&
+          formData.shipping_info && formData.refund_policy && formData.social_proof.length > 0);
       case 2:
-        return !!(formData.primary_goal && formData.funnel_stage && formData.campaign_type);
-      case 3:
-        return true;
-      case 4:
         return !!(formData.target_locations && formData.age_range && formData.gender &&
-                  formData.ideal_customer && formData.interests_behaviors);
-      case 5:
-        return !!(formData.preferred_angles.length > 0 && formData.ad_copy_tone);
-      case 6:
-        return !!(formData.daily_budget && formData.risk_tolerance && formData.campaign_launch);
+          formData.ideal_customer && formData.interests_behaviors);
       default:
         return false;
     }
@@ -223,30 +172,11 @@ export default function ClientBriefForm({ onComplete }: ClientBriefFormProps) {
         shipping_info: formData.shipping_info,
         refund_policy: formData.refund_policy,
         social_proof: formData.social_proof,
-        primary_goal: formData.primary_goal,
-        secondary_goal: formData.secondary_goal || null,
-        funnel_stage: formData.funnel_stage,
-        campaign_type: formData.campaign_type,
-        has_run_meta_ads: formData.has_run_meta_ads === 'yes',
-        monthly_ad_spend: formData.monthly_ad_spend || null,
-        best_campaign_type: formData.best_campaign_type || null,
-        best_creatives: formData.best_creatives || null,
-        best_audience_type: formData.best_audience_type || null,
-        average_cpa: formData.average_cpa ? parseFloat(formData.average_cpa) : null,
-        average_roas: formData.average_roas ? parseFloat(formData.average_roas) : null,
-        past_issues: formData.past_issues || null,
         target_locations: formData.target_locations,
         age_range: formData.age_range,
         gender: formData.gender,
         ideal_customer: formData.ideal_customer,
-        interests_behaviors: formData.interests_behaviors,
-        preferred_angles: formData.preferred_angles,
-        competitors_to_avoid: formData.competitors_to_avoid || null,
-        brand_guidelines: formData.brand_guidelines || null,
-        ad_copy_tone: formData.ad_copy_tone,
-        daily_budget: parseFloat(formData.daily_budget),
-        risk_tolerance: formData.risk_tolerance,
-        campaign_launch: formData.campaign_launch
+        interests_behaviors: formData.interests_behaviors
       };
 
       const { brief, error: saveError } = await createBriefVersion(user.id, briefDataToSave);
@@ -271,15 +201,7 @@ export default function ClientBriefForm({ onComplete }: ClientBriefFormProps) {
       case 1:
         return <Section2 formData={formData} onChange={handleInputChange} onCheckboxChange={handleCheckboxChange} />;
       case 2:
-        return <Section3 formData={formData} onChange={handleInputChange} />;
-      case 3:
-        return <Section4 formData={formData} onChange={handleInputChange} />;
-      case 4:
         return <Section5 formData={formData} onChange={handleInputChange} />;
-      case 5:
-        return <Section6 formData={formData} onChange={handleInputChange} onCheckboxChange={handleCheckboxChange} />;
-      case 6:
-        return <Section7 formData={formData} onChange={handleInputChange} />;
       default:
         return null;
     }
@@ -306,11 +228,10 @@ export default function ClientBriefForm({ onComplete }: ClientBriefFormProps) {
             {sections.map((_, index) => (
               <div
                 key={index}
-                className={`h-2 flex-1 rounded-full transition-colors ${
-                  index <= currentSection
-                    ? 'bg-blue-600'
-                    : 'bg-slate-200 dark:bg-slate-700'
-                }`}
+                className={`h-2 flex-1 rounded-full transition-colors ${index <= currentSection
+                  ? 'bg-blue-600'
+                  : 'bg-slate-200 dark:bg-slate-700'
+                  }`}
               />
             ))}
           </div>
@@ -760,211 +681,6 @@ function Section2({ formData, onChange, onCheckboxChange }: any) {
   );
 }
 
-function Section3({ formData, onChange }: any) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Primary Goal *
-        </label>
-        <select
-          value={formData.primary_goal}
-          onChange={(e) => onChange('primary_goal', e.target.value)}
-          className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-          required
-        >
-          <option value="">Select...</option>
-          <option value="Sales">Sales</option>
-          <option value="Leads">Leads</option>
-          <option value="Messages">Messages</option>
-          <option value="Traffic">Traffic</option>
-          <option value="Awareness">Awareness</option>
-        </select>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Secondary Goal
-        </label>
-        <select
-          value={formData.secondary_goal}
-          onChange={(e) => onChange('secondary_goal', e.target.value)}
-          className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-        >
-          <option value="">None</option>
-          <option value="Sales">Sales</option>
-          <option value="Leads">Leads</option>
-          <option value="Messages">Messages</option>
-          <option value="Traffic">Traffic</option>
-          <option value="Awareness">Awareness</option>
-        </select>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Funnel Stage *
-        </label>
-        <select
-          value={formData.funnel_stage}
-          onChange={(e) => onChange('funnel_stage', e.target.value)}
-          className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-          required
-        >
-          <option value="">Select...</option>
-          <option value="Cold prospecting">Cold prospecting</option>
-          <option value="Retargeting">Retargeting</option>
-          <option value="Full funnel">Full funnel</option>
-        </select>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Campaign Type *
-        </label>
-        <select
-          value={formData.campaign_type}
-          onChange={(e) => onChange('campaign_type', e.target.value)}
-          className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-          required
-        >
-          <option value="">Select...</option>
-          <option value="New test">New test</option>
-          <option value="Scaling">Scaling</option>
-          <option value="Relaunch">Relaunch</option>
-        </select>
-      </div>
-    </div>
-  );
-}
-
-function Section4({ formData, onChange }: any) {
-  return (
-    <div className="space-y-6">
-      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-        <p className="text-sm text-blue-800 dark:text-blue-300">
-          This section is optional but helps us optimize your campaigns based on past performance.
-        </p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Have Meta Ads Run Before?
-        </label>
-        <select
-          value={formData.has_run_meta_ads}
-          onChange={(e) => onChange('has_run_meta_ads', e.target.value)}
-          className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-        >
-          <option value="no">No</option>
-          <option value="yes">Yes</option>
-        </select>
-      </div>
-
-      {formData.has_run_meta_ads === 'yes' && (
-        <>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Monthly Ad Spend Range
-            </label>
-            <select
-              value={formData.monthly_ad_spend}
-              onChange={(e) => onChange('monthly_ad_spend', e.target.value)}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-            >
-              <option value="">Select...</option>
-              <option value="Less than $1,000">Less than $1,000</option>
-              <option value="$1,000 - $5,000">$1,000 - $5,000</option>
-              <option value="$5,000 - $10,000">$5,000 - $10,000</option>
-              <option value="$10,000 - $25,000">$10,000 - $25,000</option>
-              <option value="$25,000+">$25,000+</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Best Campaign Type
-            </label>
-            <input
-              type="text"
-              value={formData.best_campaign_type}
-              onChange={(e) => onChange('best_campaign_type', e.target.value)}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-              placeholder="e.g., Advantage+ Shopping"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Best Creatives
-            </label>
-            <textarea
-              value={formData.best_creatives}
-              onChange={(e) => onChange('best_creatives', e.target.value)}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-              rows={2}
-              placeholder="Describe what worked best..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Best Audience Type
-            </label>
-            <input
-              type="text"
-              value={formData.best_audience_type}
-              onChange={(e) => onChange('best_audience_type', e.target.value)}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-              placeholder="e.g., Broad, Lookalike, Interest-based"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Average CPA / CPL
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.average_cpa}
-                onChange={(e) => onChange('average_cpa', e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Average ROAS
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.average_roas}
-                onChange={(e) => onChange('average_roas', e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Past Issues (Rejections, CPM, Quality)
-            </label>
-            <textarea
-              value={formData.past_issues}
-              onChange={(e) => onChange('past_issues', e.target.value)}
-              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-              rows={3}
-              placeholder="Describe any past issues or challenges..."
-            />
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 function Section5({ formData, onChange }: any) {
   return (
     <div className="space-y-6">
@@ -1039,139 +755,6 @@ function Section5({ formData, onChange }: any) {
           placeholder="e.g., Fitness enthusiasts, online shoppers, tech-savvy"
           required
         />
-      </div>
-    </div>
-  );
-}
-
-function Section6({ formData, onChange, onCheckboxChange }: any) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Preferred Angles * (Select all that apply)
-        </label>
-        <div className="space-y-2">
-          {['Problem–solution', 'Lifestyle', 'Testimonial', 'Offer-driven', 'Educational', 'Test all'].map((angle) => (
-            <label key={angle} className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={formData.preferred_angles.includes(angle)}
-                onChange={(e) => onCheckboxChange('preferred_angles', angle, e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-slate-700 dark:text-slate-300">{angle}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Competitors to Avoid
-        </label>
-        <textarea
-          value={formData.competitors_to_avoid}
-          onChange={(e) => onChange('competitors_to_avoid', e.target.value)}
-          className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-          rows={2}
-          placeholder="List competitors we should avoid referencing..."
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Brand Guidelines
-        </label>
-        <textarea
-          value={formData.brand_guidelines}
-          onChange={(e) => onChange('brand_guidelines', e.target.value)}
-          className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-          rows={3}
-          placeholder="Any specific brand guidelines or requirements..."
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Ad Copy Tone *
-        </label>
-        <select
-          value={formData.ad_copy_tone}
-          onChange={(e) => onChange('ad_copy_tone', e.target.value)}
-          className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-          required
-        >
-          <option value="">Select...</option>
-          <option value="Direct">Direct</option>
-          <option value="Soft">Soft</option>
-          <option value="Emotional">Emotional</option>
-          <option value="Educational">Educational</option>
-          <option value="Urgent">Urgent</option>
-        </select>
-      </div>
-    </div>
-  );
-}
-
-function Section7({ formData, onChange }: any) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Daily Budget *
-        </label>
-        <input
-          type="number"
-          step="0.01"
-          value={formData.daily_budget}
-          onChange={(e) => onChange('daily_budget', e.target.value)}
-          className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-          placeholder="Enter daily budget amount"
-          required
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Risk Tolerance *
-        </label>
-        <select
-          value={formData.risk_tolerance}
-          onChange={(e) => onChange('risk_tolerance', e.target.value)}
-          className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-          required
-        >
-          <option value="">Select...</option>
-          <option value="Conservative">Conservative</option>
-          <option value="Balanced">Balanced</option>
-          <option value="Aggressive">Aggressive</option>
-        </select>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          Conservative: Slow scaling, lower risk | Balanced: Moderate scaling | Aggressive: Fast scaling, higher risk
-        </p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Campaign Launch *
-        </label>
-        <select
-          value={formData.campaign_launch}
-          onChange={(e) => onChange('campaign_launch', e.target.value)}
-          className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-          required
-        >
-          <option value="">Select...</option>
-          <option value="Paused for review">Paused for review</option>
-          <option value="Live immediately">Live immediately</option>
-        </select>
-      </div>
-
-      <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-        <p className="text-sm text-green-800 dark:text-green-300">
-          You're almost done! Review your information and click "Submit Brief" to continue to Meta account selection.
-        </p>
       </div>
     </div>
   );
