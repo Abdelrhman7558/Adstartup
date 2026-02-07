@@ -65,8 +65,9 @@ export default function SignUp() {
         return;
       }
 
-      // Redirect to confirmation page with email
-      navigate(`/auth/confirm?email=${encodeURIComponent(email)}`);
+      // Store email in sessionStorage and redirect to confirmation page
+      sessionStorage.setItem('signupEmail', email);
+      navigate('/auth/confirm');
     } catch (err: any) {
       setError(err.message || 'An error occurred');
       setShake(true);

@@ -1,18 +1,152 @@
-import { useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, CheckCircle, ArrowRight } from 'lucide-react';
+import { Mail, CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import logoNew from '../assets/logo-new.png';
 
 export default function SignupDone() {
     const [searchParams] = useSearchParams();
-    const email = searchParams.get('email') || '';
+    const navigate = useNavigate();
+    const { user } = useAuth();
+    const source = searchParams.get('source') || '';
+    const isGoogleSignup = source === 'google';
+
+    // Get email from sessionStorage (for regular signup)
+    const [email, setEmail] = useState('');
+    const [isCheckingAuth, setIsCheckingAuth] = useState(isGoogleSignup);
 
     useEffect(() => {
+        const storedEmail = sessionStorage.getItem('signupEmail');
+        if (storedEmail) {
+            setEmail(storedEmail);
+            // Clear it after reading
+            sessionStorage.removeItem('signupEmail');
+        }
         // Prevent going back to signup form
         window.history.pushState(null, '', window.location.href);
     }, []);
 
+    useEffect(() => {
+        // For Google signup, check if user is authenticated and redirect to dashboard
+        if (isGoogleSignup && user) {
+            // User is authenticated via Google, redirect to dashboard after a brief moment
+            const timer = setTimeout(() => {
+                navigate('/dashboard');
+            }, 2000);
+            return () => clearTimeout(timer);
+        } else if (isGoogleSignup) {
+            // Still checking auth
+            setIsCheckingAuth(true);
+            const timer = setTimeout(() => {
+                setIsCheckingAuth(false);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [isGoogleSignup, user, navigate]);
+
+    // Show loading state for Google signup
+    if (isGoogleSignup && isCheckingAuth && !user) {
+        return (
+            <div className="min-h-screen bg-black text-white flex items-center justify-center">
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center"
+                >
+                    <Loader2 className="w-12 h-12 text-red-500 animate-spin mx-auto mb-4" />
+                    <p className="text-gray-400">Setting up your account...</p>
+                </motion.div>
+            </div>
+        );
+    }
+
+    // Show success for Google signup (already authenticated)
+    if (isGoogleSignup && user) {
+        return (
+            <div className="min-h-screen bg-black text-white flex">
+                {/* Left Side */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.6 }}
+                    className="hidden lg:flex lg:w-1/2 items-center justify-center p-12 relative overflow-hidden"
+                >
+                    <div className="relative z-10 max-w-lg">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
+                                <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-contain" />
+                            </div>
+                            <div className="text-6xl font-bold text-red-600">The Ad Agent</div>
+                        </div>
+                        <h1 className="text-5xl font-bold mb-4">
+                            Welcome <span className="text-red-600">Aboard!</span>
+                        </h1>
+                        <p className="text-gray-400 text-lg">
+                            Your account is ready. Let's create amazing campaigns!
+                        </p>
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-red-600/10 via-transparent to-transparent" />
+                </motion.div>
+
+                {/* Right Side */}
+                <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.5 }}
+                        className="w-full max-w-md text-center"
+                    >
+                        {/* Mobile Logo */}
+                        <div className="lg:hidden mb-8">
+                            <div className="flex flex-col items-center mb-4">
+                                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-2">
+                                    <img src={logoNew} alt="The Ad Agent Logo" className="w-full h-full object-contain" />
+                                </div>
+                                <div className="text-4xl font-bold text-red-600">The Ad Agent</div>
+                            </div>
+                        </div>
+
+                        {/* Success Icon */}
+                        <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
+                            className="mb-6 flex justify-center"
+                        >
+                            <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center border-2 border-green-500/30">
+                                <CheckCircle className="w-12 h-12 text-green-500" />
+                            </div>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 }}
+                        >
+                            <h2 className="text-3xl font-bold mb-4 text-green-400">Welcome!</h2>
+                            <p className="text-gray-400 mb-2 text-lg">
+                                Your account has been created successfully!
+                            </p>
+                            <p className="text-gray-500 mb-8">
+                                Redirecting you to dashboard...
+                            </p>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.5 }}
+                        >
+                            <Loader2 className="w-6 h-6 text-red-500 animate-spin mx-auto" />
+                        </motion.div>
+                    </motion.div>
+                </div>
+            </div>
+        );
+    }
+
+    // Regular email signup - show verification instructions
     return (
         <div className="min-h-screen bg-black text-white flex">
             {/* Left Side - Branding (Desktop Only) */}

@@ -291,7 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      const redirectTo = `${PRODUCTION_DOMAIN}/auth/confirm`;
+      const redirectTo = `${PRODUCTION_DOMAIN}/auth/confirm?source=google`;
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -319,7 +319,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         country: !!country
       });
 
-      const emailRedirectTo = `${PRODUCTION_DOMAIN}/auth/confirm`;
+      const emailRedirectTo = `${PRODUCTION_DOMAIN}/auth/verified`;
 
       console.log('[SignUp] Step 1: Creating Supabase Auth user...');
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
