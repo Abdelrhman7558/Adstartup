@@ -439,8 +439,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn('[SignUp] Step 4: WARNING - Could not manage profile (non-critical):', profileCheckError);
       }
 
-      // Send webhook notification (non-critical)
-      console.log('[SignUp] Step 5: Sending webhook notification...');
+      // Send webhook notification AND create user via server-side (bypasses RLS)
+      console.log('[SignUp] Step 5: Sending webhook to create user in database...');
       try {
         const webhookResponse = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/Sign-up', {
           method: 'POST',
@@ -453,16 +453,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             phoneNumber: phoneNumber || '',
             country: country || 'US',
             timestamp: new Date().toISOString(),
+            // CRITICAL: Tell n8n to create the user in public.users table
+            create_user_in_db: true,
           }),
         });
 
         if (webhookResponse.ok) {
-          console.log('[SignUp] Step 5: Webhook sent successfully');
+          const responseData = await webhookResponse.json().catch(() => ({}));
+          console.log('[SignUp] Step 5: Webhook response:', responseData);
+
+          if (responseData.user_created) {
+            console.log('[SignUp] Step 5: User created successfully via webhook');
+          } else {
+            console.warn('[SignUp] Step 5: Webhook did not confirm user creation');
+          }
         } else {
-          console.warn('[SignUp] Step 5: Webhook returned non-200 status:', webhookResponse.status);
+          console.error('[SignUp] Step 5: Webhook failed with status:', webhookResponse.status);
         }
       } catch (webhookError) {
-        console.warn('[SignUp] Step 5: Webhook error (non-critical):', webhookError);
+        console.error('[SignUp] Step 5: Webhook error:', webhookError);
+      }
+
+      // Final verification: Wait and check if user exists now
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      try {
+        const { data: finalCheck } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (finalCheck) {
+          console.log('[SignUp] VERIFIED: User exists in database');
+        } else {
+          console.error('[SignUp] CRITICAL: User still not in database after all attempts!');
+        }
+      } catch (e) {
+        console.error('[SignUp] Final check failed:', e);
       }
 
       console.log('[SignUp] COMPLETE: Signup successful');

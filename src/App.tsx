@@ -8,7 +8,8 @@ import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
-import AuthConfirm from './pages/AuthConfirm';
+import SignupDone from './pages/SignupDone';
+import AuthVerified from './pages/AuthVerified';
 import MetaCallback from './pages/MetaCallback';
 import MetaSelect from './pages/MetaSelect';
 import Brief from './pages/Brief';
@@ -41,7 +42,8 @@ function AppContent() {
       <Route path="/signup" element={<SignUp />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/auth/confirm" element={<AuthConfirm />} />
+      <Route path="/auth/confirm" element={<SignupDone />} />
+      <Route path="/auth/verified" element={<AuthVerified />} />
       <Route path="/meta-callback" element={<MetaCallback />} />
       {/* TEMPORARILY UNPROTECTED FOR DEBUGGING - Was ProtectedRoute */}
       <Route path="/meta-select" element={<MetaSelect />} />
