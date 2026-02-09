@@ -71,7 +71,10 @@ export default function MultipleMetaAccountsDropdown() {
             setAccounts(data || []);
         } catch (err) {
             console.error('Error loading Meta accounts:', err);
-            setError('Failed to load accounts');
+            setError(err instanceof Error ? err.message : 'Failed to load accounts');
+            if (typeof err === 'object' && err !== null && 'message' in err) {
+                setError((err as any).message);
+            }
         } finally {
             setLoading(false);
         }
