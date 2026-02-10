@@ -369,6 +369,7 @@ export default function MetaSelect() {
         pixel_name: selectedPixelData?.name || '',
         catalog_id: selectedCatalog || null,
         catalog_name: selectedCatalogData?.name || null,
+        is_manager_connection: searchParams.get('mode') === 'manager',
       };
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;

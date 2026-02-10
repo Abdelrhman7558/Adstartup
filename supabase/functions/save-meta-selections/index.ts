@@ -17,6 +17,7 @@ interface SelectionPayload {
   pixel_name?: string;
   catalog_id?: string;
   catalog_name?: string;
+  is_manager_connection?: boolean;
 }
 
 Deno.serve(async (req: Request) => {
@@ -86,6 +87,36 @@ Deno.serve(async (req: Request) => {
       }
 
       briefData = fetchedBrief;
+    }
+
+    // MANAGER PLAN LOGIC: If this is a manager adding an extra account
+    if (payload.is_manager_connection) {
+      // 1. Fetch the access_token from the main selection table (where callback saved it)
+      const { data: existingSelection, error: fetchError } = await supabase
+        .from('meta_account_selections')
+        .select('access_token')
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError || !existingSelection?.access_token) {
+        console.error('Error fetching access token for manager connection:', fetchError);
+        // Continue but log error - maybe token expired or missing
+      } else {
+        // 2. Insert into manager_meta_accounts
+        const { error: managerInsertError } = await supabase
+          .from('manager_meta_accounts')
+          .insert({
+            user_id: user.id,
+            account_id: payload.ad_account_id,
+            account_name: payload.ad_account_name,
+            access_token: existingSelection.access_token
+          });
+
+        if (managerInsertError) {
+          console.error('Error saving to manager_meta_accounts:', managerInsertError);
+          // Don't fail the whole request, but log it
+        }
+      }
     }
 
     const { data: selectionData, error: selectionError } = await supabase
