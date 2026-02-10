@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { Home, UploadCloud, Settings, LogOut, Menu, X, Moon, Sun, BarChart3, Folder, FileText, BarChart2, RefreshCw, Plus, Clock, FolderOpen, Zap } from 'lucide-react';
+import { Home, UploadCloud, Settings, LogOut, Menu, X, Moon, Sun, BarChart2, RefreshCw, Plus, Clock, FolderOpen, Zap, ShieldCheck, FileText } from 'lucide-react';
 import HomeView from '../components/dashboard/ProductionHomeView';
 import AssetsView from '../components/dashboard/ProductionAssetsView';
 import InsightsView from '../components/dashboard/InsightsView';
@@ -12,9 +12,9 @@ import SettingsModal from '../components/dashboard/SettingsModal';
 import EditBriefModal from '../components/dashboard/EditBriefModal';
 import NewCampaignModal from '../components/dashboard/NewCampaignModal';
 import NotificationsDropdown from '../components/NotificationsDropdown';
-import CountrySelector from '../components/CountrySelector';
 import SupportChatbot from '../components/SupportChatbot';
 import MultipleMetaAccountsDropdown from '../components/MultipleMetaAccountsDropdown';
+import MetaAccountsManager from '../components/dashboard/MetaAccountsManager';
 import { supabase } from '../lib/supabase';
 import { fetchDashboardData, DashboardData } from '../lib/dashboardDataService';
 import { isManagerPlanUser } from '../lib/managerPlanService';
@@ -37,6 +37,7 @@ export default function ProductionDashboard() {
   const [trialExpired, setTrialExpired] = useState(false);
   const [remainingDays, setRemainingDays] = useState<number>(0);
   const [trialActive, setTrialActive] = useState(false);
+  const [showMetaManager, setShowMetaManager] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -56,7 +57,7 @@ export default function ProductionDashboard() {
       return;
     }
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('users')
       .select('display_name, theme_preference')
       .eq('id', user.id)
@@ -333,10 +334,11 @@ export default function ProductionDashboard() {
                     {/* For Manager users: Always show Connect Meta button */}
                     {isManager && (
                       <button
-                        onClick={handleConnectMeta}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
+                        onClick={() => setShowMetaManager(true)}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm flex items-center gap-2"
                       >
-                        Connect Meta
+                        <Settings className="w-4 h-4" />
+                        Manage Accounts
                       </button>
                     )}
 
@@ -440,6 +442,14 @@ export default function ProductionDashboard() {
           isOpen={showNewCampaignModal}
           onClose={() => setShowNewCampaignModal(false)}
           onSuccess={loadDashboardData}
+        />
+      )}
+
+      {/* Meta Accounts Manager Modal */}
+      {showMetaManager && (
+        <MetaAccountsManager
+          isOpen={showMetaManager}
+          onClose={() => setShowMetaManager(false)}
         />
       )}
 
