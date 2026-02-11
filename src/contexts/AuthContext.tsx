@@ -388,6 +388,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               id: userId,
               email: email,
               full_name: fullName || 'User', // Ensure partial profile data is present
+              country: country || null,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             });

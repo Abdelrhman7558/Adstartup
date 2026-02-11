@@ -5,6 +5,7 @@ export interface User {
   email: string;
   full_name?: string;
   phone_number?: string;
+  country?: string;
   status: 'pending_verification' | 'active' | 'suspended';
   email_verified: boolean;
   verified_at?: string;
@@ -24,7 +25,7 @@ export interface AuthResponse {
 }
 
 class NewAuthService {
-  async signUp(email: string, password: string, fullName: string, phoneNumber?: string, planType: 'free' | 'trial' = 'free') {
+  async signUp(email: string, password: string, fullName: string, phoneNumber?: string, country?: string, planType: 'free' | 'trial' = 'free') {
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -33,6 +34,7 @@ class NewAuthService {
           data: {
             full_name: fullName,
             phone_number: phoneNumber || '',
+            country: country || '',
           },
           emailRedirectTo: `${window.location.origin}/auth/confirm`,
         },
@@ -46,6 +48,7 @@ class NewAuthService {
         .update({
           full_name: fullName,
           phone_number: phoneNumber || null,
+          country: country || null,
         })
         .eq('id', authData.user.id);
 
