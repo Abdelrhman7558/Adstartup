@@ -185,7 +185,7 @@ Deno.serve(async (req: Request) => {
 
     try {
       const webhookResponse = await fetch(
-        'https://n8n.srv1181726.hstgr.cloud/webhook/Collect-All-Account',
+        'https://n8n.srv1181726.hstgr.cloud/webhook-test/meta-save-selection',
         {
           method: 'POST',
           headers: {
