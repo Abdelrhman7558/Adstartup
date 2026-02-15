@@ -383,7 +383,10 @@ export default function MetaSelect() {
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error('Failed to save selections');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save selections');
+      }
 
       const result = await response.json();
       if (result.success || result.data) {

@@ -185,8 +185,9 @@ Deno.serve(async (req: Request) => {
     };
 
     try {
+      console.log('Sending data to n8n webhook...');
       const webhookResponse = await fetch(
-        'https://n8n.srv1181726.hstgr.cloud/webhook/meta-save-selection',
+        'https://n8n.srv1181726.hstgr.cloud/webhook-test/meta-save-selection',
         {
           method: 'POST',
           headers: {
@@ -196,18 +197,28 @@ Deno.serve(async (req: Request) => {
         }
       );
 
-      if (webhookResponse.ok) {
-        const webhookResult = await webhookResponse.json();
-        await supabase
-          .from('meta_account_selections')
-          .update({
-            webhook_submitted: true,
-            webhook_response: webhookResult
-          })
-          .eq('id', selectionData.id);
+      if (!webhookResponse.ok) {
+        throw new Error(`Webhook failed with status: ${webhookResponse.status}`);
       }
+
+      const webhookResult = await webhookResponse.json();
+      console.log('Webhook success:', webhookResult);
+
+      await supabase
+        .from('meta_account_selections')
+        .update({
+          webhook_submitted: true,
+          webhook_response: webhookResult
+        })
+        .eq('id', selectionData.id);
+
     } catch (webhookError) {
       console.error('Webhook error:', webhookError);
+      // Return error to frontend so it doesn't redirect
+      return new Response(
+        JSON.stringify({ error: 'Failed to send data to external webhook. Please try again.' }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     return new Response(
