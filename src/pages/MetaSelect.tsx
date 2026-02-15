@@ -360,6 +360,7 @@ export default function MetaSelect() {
       const selectedCatalogData = catalogs.find(cat => cat.id === selectedCatalog);
 
       const payload = {
+        user_id: validatedUserId,
         brief_id: searchParams.get('briefId') || null,
         page_id: selectedPage,
         page_name: selectedPageData?.name || '',

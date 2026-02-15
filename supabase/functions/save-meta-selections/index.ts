@@ -52,6 +52,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const payload: SelectionPayload = await req.json();
+    const targetUserId = payload.user_id || user.id;
 
     if (!payload.ad_account_id) {
       return new Response(
@@ -68,7 +69,7 @@ Deno.serve(async (req: Request) => {
         .from('client_briefs')
         .select('*')
         .eq('id', payload.brief_id)
-        .eq('user_id', user.id)
+        .eq('user_id', targetUserId)
         .maybeSingle();
 
       if (briefError) {
@@ -122,7 +123,7 @@ Deno.serve(async (req: Request) => {
     const { data: selectionData, error: selectionError } = await supabase
       .from('meta_account_selections')
       .upsert({
-        user_id: user.id,
+        user_id: targetUserId,
         brief_id: payload.brief_id || null,
         ad_account_id: payload.ad_account_id,
         ad_account_name: payload.ad_account_name,
@@ -150,7 +151,7 @@ Deno.serve(async (req: Request) => {
     const { error: connectionError } = await supabase
       .from('meta_connections')
       .upsert({
-        user_id: user.id,
+        user_id: targetUserId,
         ad_account_id: payload.ad_account_id,
         pixel_id: payload.pixel_id || null,
         page_id: payload.page_id || null,
@@ -170,7 +171,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const webhookPayload = {
-      user_id: user.id,
+      user_id: targetUserId,
       brief_id: payload.brief_id || null,
       page_id: payload.page_id || null,
       page_name: payload.page_name || null,
