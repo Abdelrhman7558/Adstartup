@@ -253,13 +253,16 @@ export default function MetaAccountsManager({ isOpen, onClose }: MetaAccountsMan
                         </button>
                         <button
                             onClick={() => {
-                                // Redirect to standard OAuth
+                                // Redirect to Supabase Edge Function instead of n8n
                                 const clientId = '891623109984411';
-                                const redirectUri = 'https://n8n.srv1181726.hstgr.cloud/webhook/Meta-Callback';
-                                // Add manager suffix to state
-                                const state = `${user?.id}__manager`;
-                                const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,ads_read,business_management,catalog_management';
-                                window.location.href = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}`;
+                                const redirectUri = 'https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback';
+
+                                // Create a base64 encoded state for security
+                                const stateContent = `${user?.id}:${Date.now()}__manager`;
+                                const state = btoa(stateContent);
+
+                                const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management';
+                                window.location.href = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}&response_type=code`;
                             }}
                             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all"
                         >

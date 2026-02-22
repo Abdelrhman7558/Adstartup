@@ -84,14 +84,18 @@ export default function Dashboard() {
     if (!user?.id) return;
 
     const clientId = '891623109984411';
-    const redirectUri =
-      'https://n8n.srv1181726.hstgr.cloud/webhook/Meta-Callback';
-    const scope =
-      'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,ads_read,business_management,catalog_management';
+
+    // Use Supabase Edge Function instead of n8n
+    const redirectUri = 'https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback';
+    const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management';
+
+    // Create a base64 encoded state for security
+    const stateContent = `${user.id}:${Date.now()}`;
+    const state = btoa(stateContent);
 
     window.location.href = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
-    )}&scope=${encodeURIComponent(scope)}&state=${user.id}`;
+    )}&scope=${encodeURIComponent(scope)}&state=${state}&response_type=code`;
   };
 
   const handleSignOut = async () => {
@@ -136,9 +140,8 @@ export default function Dashboard() {
                   <span className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-8 bg-[#B11226] rounded-full" />
                 )}
                 <Icon
-                  className={`w-6 h-6 ${
-                    active ? 'text-[#B11226]' : 'text-[#1A1A1A]'
-                  }`}
+                  className={`w-6 h-6 ${active ? 'text-[#B11226]' : 'text-[#1A1A1A]'
+                    }`}
                 />
               </button>
             );

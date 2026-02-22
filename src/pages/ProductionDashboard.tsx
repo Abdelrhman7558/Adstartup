@@ -149,19 +149,18 @@ export default function ProductionDashboard() {
     }
 
     const clientId = '891623109984411';
-    // Reverting to n8n Webhook as requested
-    const redirectUri = 'https://n8n.srv1181726.hstgr.cloud/webhook/Meta-Callback';
-    const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,ads_read,business_management,catalog_management';
 
-    // Check for manager plan
-    const MANAGER_EMAILS = ['jihadalcc@gmail.com', '7bd02025@gmail.com'];
-    const isManager = MANAGER_EMAILS.includes(user.email?.toLowerCase() || '') || isManagerPlanUser(user.email);
+    // Use Supabase Edge Function instead of n8n
+    const redirectUri = 'https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback';
+    const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management';
 
-    // Append __manager suffix if user is a manager, to trigger multi-account logic in backend
-    const state = isManager ? `${user.id}__manager` : user.id;
+    // Create a base64 encoded state for security
+    const validatedUserId = user.id;
+    const stateContent = `${validatedUserId}:${Date.now()}`;
+    const state = btoa(stateContent);
 
-    // Standard OAuth Code Flow (n8n handles the rest)
-    const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}`;
+    // Standard OAuth Code Flow
+    const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}&response_type=code`;
 
     window.location.href = oauthUrl;
   };

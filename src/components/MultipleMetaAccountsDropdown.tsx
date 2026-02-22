@@ -109,11 +109,14 @@ export default function MultipleMetaAccountsDropdown() {
         if (!user?.id) return;
 
         const clientId = '891623109984411';
-        const redirectUri = 'https://n8n.srv1181726.hstgr.cloud/webhook/Meta-Callback';
-        const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,ads_read,business_management,catalog_management';
-        const state = `${user.id}__manager`; // Special state to indicate Manager multi-account
+        const redirectUri = 'https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback';
+        const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management';
 
-        const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}`;
+        // Create a base64 encoded state for security and manager flag
+        const stateContent = `${user.id}:${Date.now()}__manager`;
+        const state = btoa(stateContent);
+
+        const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}&response_type=code`;
 
         window.location.href = oauthUrl;
     };
