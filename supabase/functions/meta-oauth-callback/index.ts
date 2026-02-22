@@ -17,6 +17,8 @@ const META_APP_SECRET = "8f6fff4ae8d38941f44ca40211ce1239";
 const FB_API_VERSION = "v19.0";
 
 Deno.serve(async (req: Request) => {
+  let redirectBase = "https://the-adagent.com/meta-callback"; // Default fallback
+
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
@@ -27,8 +29,7 @@ Deno.serve(async (req: Request) => {
     const state = url.searchParams.get("state");
     const error = url.searchParams.get("error");
 
-    // Redirect user back to frontend after completion
-    const redirectBase = "https://the-adagent.com/meta-callback"; // Adjust as needed
+    // Redirect user back to frontend after completion (dynamically determined later)
 
     if (error) {
       console.error("[OAuth] Meta error:", error);
@@ -41,16 +42,24 @@ Deno.serve(async (req: Request) => {
     }
 
     // ─── Phase 1: Decode State ───────────────────────────────────────
-    let decodedState: OAuthState;
+    let decodedState: OAuthState & { origin?: string };
+
     try {
       // Handle URL-encoded base64 if necessary
       const decodedUrlState = decodeURIComponent(state);
       const stateString = atob(decodedUrlState);
 
-      // Handle "USER_ID:TIMESTAMP" format OR JSON format
+      // Handle "USER_ID:TIMESTAMP:ORIGIN" format
       if (stateString.includes(':')) {
-        const [userId, timestamp] = stateString.split(':');
-        decodedState = { userId, timestamp: parseInt(timestamp) };
+        const parts = stateString.split(':');
+        const userId = parts[0];
+        const timestamp = parseInt(parts[1]);
+        const origin = parts[2]?.split('__')[0]; // Split optional __manager flag
+
+        decodedState = { userId, timestamp };
+        if (origin && origin.startsWith('http')) {
+          redirectBase = `${origin}/meta-callback`;
+        }
       } else {
         decodedState = JSON.parse(stateString);
       }
@@ -181,6 +190,7 @@ Deno.serve(async (req: Request) => {
 
   } catch (err: any) {
     console.error("[OAuth] Global callback error:", err.message);
-    return Response.redirect(`https://the-adagent.com/meta-callback?error=server_error`, 302);
+    const fallback = "https://the-adagent.com/meta-callback"; // Static fallback for catastrophic errors before state decode
+    return Response.redirect(`${fallback}?error=server_error`, 302);
   }
 });
