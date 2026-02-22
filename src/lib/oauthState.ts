@@ -83,8 +83,8 @@ function generateRandomNonce(): string {
 
 export const META_OAUTH_CONFIG = {
   clientId: '891623109984411',
-  redirectUri: 'https://n8n.srv1181726.hstgr.cloud/webhook-test/Meta-Callback',
-  scope: 'ads_management,ads_read,business_management,ads_read,business_management,catalog_management',
+  redirectUri: 'https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback',
+  scope: 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management',
   version: 'v19.0',
 };
 
@@ -99,7 +99,8 @@ export function buildMetaOAuthUrl(userId: string): string {
     client_id: META_OAUTH_CONFIG.clientId,
     redirect_uri: META_OAUTH_CONFIG.redirectUri,
     scope: META_OAUTH_CONFIG.scope,
-    state: userId,
+    state: btoa(`${userId}:${Date.now()}`),
+    response_type: 'code',
   });
 
   return `https://www.facebook.com/${META_OAUTH_CONFIG.version}/dialog/oauth?${params.toString()}`;

@@ -48,7 +48,7 @@ export function getMetaOAuthUrl(userId: string): string {
 
   const state = generateMetaOAuthState(userId);
   const clientId = '891623109984411';
-  const redirectUri = 'https://n8n.srv1181726.hstgr.cloud/webhook/Meta-Callback';
+  const redirectUri = 'https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback';
   const scope = 'ads_management,ads_read,business_management,pages_read_engagement,pages_show_list,instagram_basic,ads_read,business_management,catalog_management';
 
   const params = new URLSearchParams({
