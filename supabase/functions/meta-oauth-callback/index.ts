@@ -189,8 +189,8 @@ Deno.serve(async (req: Request) => {
     return Response.redirect(`${redirectBase}?meta_connected=true&user_id=${userId}`, 302);
 
   } catch (err: any) {
-    console.error("[OAuth] Global callback error:", err.message);
+    console.error("[OAuth] Global callback error:", err.stack);
     const fallback = "https://the-adagent.com/meta-callback"; // Static fallback for catastrophic errors before state decode
-    return Response.redirect(`${fallback}?error=server_error`, 302);
+    return Response.redirect(`${fallback}?error=server_error&details=${encodeURIComponent(err.message)}`, 302);
   }
 });
