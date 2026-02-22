@@ -32,19 +32,18 @@ export default function ConnectMetaButton({
     try {
       const validatedUserId = validateUserId(userId);
       const clientId = '891623109984411';
-      // Use Frontend Callback directly to bypass n8n failure
-      const redirectUri = `${window.location.origin}/meta-callback`;
-      // Use Implicit Grant (response_type=token)
-      const scope = encodeURIComponent('ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,ads_read,business_management,catalog_management');
 
-      // Check for manager plan (simplified logic here, main logic in dashboard)
-      const isManager = userId.endsWith('__manager'); // Basic check if passed ID has suffix
+      // Use the new Supabase Edge Function as the redirect URI
+      // This replaces the old n8n flow and handles token exchange securely
+      const redirectUri = `https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback`;
 
-      // Append __manager suffix if user is a manager and not already present
-      // Note: userId passed here should ideally be clean, but we handle state consistently
-      const state = validatedUserId;
+      const scope = encodeURIComponent('ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management');
 
-      const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${state}&response_type=token`;
+      // Create a state string with userId and timestamp for verification
+      const stateContent = `${validatedUserId}:${Date.now()}`;
+      const state = btoa(stateContent);
+
+      const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${state}&response_type=code`;
 
       window.location.href = oauthUrl;
     } catch (error) {

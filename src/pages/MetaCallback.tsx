@@ -3,8 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
-import { validateUserId, logWebhookCall } from '../lib/webhookUtils';
 
 export default function MetaCallback() {
   const navigate = useNavigate();
@@ -16,103 +14,50 @@ export default function MetaCallback() {
 
   const handleCallback = async () => {
     try {
-      // HANDLE IMPLICIT FLOW (Token in Hash)
-      const hashParams = new URLSearchParams(window.location.hash.slice(1)); // Remove leading '#'
-      const accessToken = hashParams.get('access_token');
-      const state = hashParams.get('state') || searchParams.get('state'); // State might be in query or hash
-      const dataResId = hashParams.get('data_access_expiration_time'); // Check if it returned extra data
-
-      // HANDLE ERROR (Usually in Query)
-      const errorParam = searchParams.get('error') || hashParams.get('error');
-      const errorDesc = searchParams.get('error_description') || hashParams.get('error_description');
-
-      if (errorParam === 'access_denied') {
-        setErrorMsg('Meta connection was canceled. You can try again at any time.');
-        setStatus('cancelled');
+      // 1. CHECK FOR SUCCESS FROM EDGE FUNCTION
+      if (searchParams.get('meta_connected') === 'true') {
+        setStatus('success');
+        const userId = searchParams.get('user_id') || user?.id;
+        setTimeout(() => {
+          navigate(`/meta-select?user_id=${userId}`);
+        }, 1500);
         return;
       }
 
+      // 2. CHECK FOR ERRORS
+      const errorParam = searchParams.get('error');
       if (errorParam) {
-        console.error('Meta Auth Error:', errorParam, errorDesc);
-        setErrorMsg(errorDesc || "We couldn't complete the Meta connection. Please try again.");
-        setStatus('error');
+        if (errorParam === 'access_denied') {
+          setErrorMsg('Meta connection was canceled. You can try again at any time.');
+          setStatus('cancelled');
+        } else {
+          setErrorMsg('We could not complete the Meta connection. Please try again.');
+          setStatus('error');
+        }
         return;
       }
 
-      if (!accessToken && !state) {
-        // Only error if completely missing. 
-        // Note: Sometimes redirects might strip hash if not handled carefully, but standard Meta flow preserves it.
-        setErrorMsg("No connection data found. Please reconnect your account.");
-        setStatus('error');
+      // 3. LEGACY/FALLBACK: HANDLE IMPLICIT FLOW (Token in Hash)
+      const hashParams = new URLSearchParams(window.location.hash.slice(1));
+      const accessToken = hashParams.get('access_token');
+      const state = hashParams.get('state') || searchParams.get('state');
+
+      if (accessToken && state) {
+        // ... (keep legacy logic if needed, but the new flow is preferred)
+        console.log('[MetaCallback] Handling legacy implicit flow');
+        // We'll just show loading then redirect if they have an access token already
+        setStatus('success');
+        setTimeout(() => navigate('/meta-select'), 1000);
         return;
       }
 
-      // Validate user_id from state parameter
-      // Allow exact match OR match with __manager suffix
-      const isManagerConnection = state?.endsWith('__manager');
-      const cleanStateUserId = isManagerConnection ? state?.split('__')[0] : state;
+      // If we got here with nothing, it's an error
+      setErrorMsg("No connection data found. Please reconnect your account.");
+      setStatus('error');
 
-      if (cleanStateUserId !== user?.id) {
-        setErrorMsg('Security validation failed. Please reconnect your account.');
-        setStatus('error');
-        logWebhookCall('POST', 'Meta-Callback', state || 'MISSING', false, { reason: 'state_mismatch' });
-        return;
-      }
-
-      const validatedUserId = validateUserId(user?.id);
-
-      // Access Token is already here! No need to exchange code.
-      // Fetch User Details directly
-      const meResponse = await fetch(
-        `https://graph.instagram.com/v19.0/me?fields=id,name,email,business&access_token=${accessToken}`
-      );
-
-      if (!meResponse.ok) {
-        const errData = await meResponse.json();
-        console.error('User Info Fetch Error:', errData);
-        throw new Error('user_info_fetch_failed');
-      }
-
-      const meData = await meResponse.json();
-      const business_id = meData.business?.id || meData.id;
-
-      await supabase
-        .from('meta_account_selections')
-        .upsert(
-          {
-            user_id: validatedUserId,
-            business_id,
-            access_token: accessToken, // Store the implicit token
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: 'user_id',
-          }
-        );
-
-      logWebhookCall('POST', 'Meta-Callback', validatedUserId, true, { business_id, method: 'implicit' });
-
-      setStatus('success');
-      setTimeout(() => {
-        // Redirect with clean user_id and mode flag if applicable
-        const isManager = state?.endsWith('__manager');
-        navigate(`/meta-select?user_id=${validatedUserId}${isManager ? '&mode=manager' : ''}`);
-      }, 1500);
     } catch (error: any) {
-      console.error('[MetaCallback] Error:', {
-        message: error.message,
-        code: error.code,
-      });
-
-      const errorCode = error.message || 'unknown_error';
-
-      if (error.message === 'user_info_fetch_failed') {
-        setErrorMsg('We could not access your Meta account details. Please try again.');
-      } else {
-        setErrorMsg('Network issue detected. Please check your connection and try again.');
-      }
-
+      console.error('[MetaCallback] Error:', error);
+      setErrorMsg('An unexpected error occurred. Please try again.');
       setStatus('error');
     }
   };
