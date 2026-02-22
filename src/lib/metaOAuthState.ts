@@ -4,7 +4,8 @@ export function generateMetaOAuthState(userId: string): string {
   }
 
   const timestamp = Date.now().toString();
-  const stateData = `${userId}:${timestamp}`;
+  const origin = window.location.origin;
+  const stateData = `${userId}:${timestamp}:${origin}`;
 
   const encoded = btoa(stateData);
 

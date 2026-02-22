@@ -39,8 +39,8 @@ export default function ConnectMetaButton({
 
       const scope = encodeURIComponent('ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management');
 
-      // Create a state string with userId and timestamp for verification
-      const stateContent = `${validatedUserId}:${Date.now()}`;
+      // Create a state string with userId, timestamp and origin for dynamic redirect
+      const stateContent = `${validatedUserId}:${Date.now()}:${window.location.origin}`;
       const state = btoa(stateContent);
 
       const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${state}&response_type=code`;

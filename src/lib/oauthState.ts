@@ -99,7 +99,7 @@ export function buildMetaOAuthUrl(userId: string): string {
     client_id: META_OAUTH_CONFIG.clientId,
     redirect_uri: META_OAUTH_CONFIG.redirectUri,
     scope: META_OAUTH_CONFIG.scope,
-    state: btoa(`${userId}:${Date.now()}`),
+    state: btoa(`${userId}:${Date.now()}:${window.location.origin}`),
     response_type: 'code',
   });
 

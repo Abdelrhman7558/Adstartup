@@ -257,8 +257,8 @@ export default function MetaAccountsManager({ isOpen, onClose }: MetaAccountsMan
                                 const clientId = '891623109984411';
                                 const redirectUri = 'https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback';
 
-                                // Create a base64 encoded state for security
-                                const stateContent = `${user?.id}:${Date.now()}__manager`;
+                                // Create a base64 encoded state for security and dynamic redirect
+                                const stateContent = `${user?.id}:${Date.now()}:${window.location.origin}__manager`;
                                 const state = btoa(stateContent);
 
                                 const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management';

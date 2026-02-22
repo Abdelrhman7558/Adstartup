@@ -112,8 +112,8 @@ export default function MultipleMetaAccountsDropdown() {
         const redirectUri = 'https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback';
         const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management';
 
-        // Create a base64 encoded state for security and manager flag
-        const stateContent = `${user.id}:${Date.now()}__manager`;
+        // Create a base64 encoded state for security and manager flag with dynamic redirect
+        const stateContent = `${user.id}:${Date.now()}:${window.location.origin}__manager`;
         const state = btoa(stateContent);
 
         const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}&response_type=code`;

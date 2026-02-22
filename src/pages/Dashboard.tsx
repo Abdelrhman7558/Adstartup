@@ -89,8 +89,8 @@ export default function Dashboard() {
     const redirectUri = 'https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback';
     const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management';
 
-    // Create a base64 encoded state for security
-    const stateContent = `${user.id}:${Date.now()}`;
+    // Create a base64 encoded state for security and dynamic redirect
+    const stateContent = `${user.id}:${Date.now()}:${window.location.origin}`;
     const state = btoa(stateContent);
 
     window.location.href = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(

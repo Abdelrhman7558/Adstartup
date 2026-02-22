@@ -157,9 +157,9 @@ export default function ProductionDashboard() {
     // Check for manager plan
     const isManager = isManagerPlanUser(user.email);
 
-    // Create a base64 encoded state for security
+    // Create a base64 encoded state for security and dynamic redirect
     const validatedUserId = user.id;
-    const stateContent = `${validatedUserId}:${Date.now()}${isManager ? '__manager' : ''}`;
+    const stateContent = `${validatedUserId}:${Date.now()}:${window.location.origin}${isManager ? '__manager' : ''}`;
     const state = btoa(stateContent);
 
     // Standard OAuth Code Flow
