@@ -154,9 +154,12 @@ export default function ProductionDashboard() {
     const redirectUri = 'https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback';
     const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management';
 
+    // Check for manager plan
+    const isManager = isManagerPlanUser(user.email);
+
     // Create a base64 encoded state for security
     const validatedUserId = user.id;
-    const stateContent = `${validatedUserId}:${Date.now()}`;
+    const stateContent = `${validatedUserId}:${Date.now()}${isManager ? '__manager' : ''}`;
     const state = btoa(stateContent);
 
     // Standard OAuth Code Flow
