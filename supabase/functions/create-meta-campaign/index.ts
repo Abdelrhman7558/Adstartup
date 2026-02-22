@@ -257,241 +257,240 @@ Deno.serve(async (req: Request) => {
             campaign_name: payload.campaign_name,
             ad_account_id: adAccountId,
             asset_type: payload.asset_type,
+            agent_mode: payload.agent_mode,
             has_page: !!pageId,
             has_brief: Object.keys(payload.brief || {}).length > 0,
         });
 
-        const results: Record<string, any> = {};
-
-        // ─── Step 1: Create Campaign ────────────────────────────────
-
-        const campaignResult = await metaApiPost(`/${adAccountId}/campaigns`, accessToken, {
-            name: payload.campaign_name,
-            objective: mapObjective(payload.objective),
-            status: 'PAUSED',
-            special_ad_categories: [],
-        });
-
-        if (!campaignResult.success) {
-            return new Response(
-                JSON.stringify({
-                    error: `Failed to create campaign: ${campaignResult.error}`,
-                    step: 'campaign'
-                }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        results.meta_campaign_id = campaignResult.data.id;
-        console.log('[CreateCampaign] Campaign created:', results.meta_campaign_id);
-
-        // ─── Step 2: Create Ad Set ──────────────────────────────────
-
-        const targeting = buildTargeting(payload.brief || {});
-
-        const adSetParams: Record<string, any> = {
-            campaign_id: results.meta_campaign_id,
-            name: `${payload.campaign_name} - Ad Set`,
-            billing_event: 'IMPRESSIONS',
-            optimization_goal: mapOptimizationGoal(payload.goal, payload.objective),
-            daily_budget: budgetToCents(payload.daily_budget),
-            start_time: formatMetaDateTime(payload.start_time),
-            targeting: targeting,
-            status: 'PAUSED',
+        const results: Record<string, any> = {
+            meta_campaign_id: null,
+            meta_adset_ids: [],
+            meta_creative_id: null,
+            meta_ad_ids: [],
         };
 
-        if (payload.end_time) {
-            adSetParams.end_time = formatMetaDateTime(payload.end_time);
+        const createdResources: { type: string; id: string }[] = [];
+
+        async function cleanupResources() {
+            console.log('[Cleanup] Deleting created resources in reverse order...');
+            for (const res of [...createdResources].reverse()) {
+                try {
+                    await metaApiPost(`/${res.id}`, accessToken, { status: 'DELETED' });
+                    console.log(`[Cleanup] Deleted ${res.type}: ${res.id}`);
+                } catch (e: any) {
+                    console.error(`[Cleanup] Failed to delete ${res.type}: ${res.id}`, e.message);
+                }
+            }
         }
 
-        // If pixel exists, set promoted_object
-        if (meta_connection.pixel_id) {
-            adSetParams.promoted_object = { pixel_id: meta_connection.pixel_id };
-        }
+        try {
+            // ─── Step 1: Create Campaign ────────────────────────────────
 
-        // If catalog campaign, set product catalog
-        if (payload.asset_type === 'catalog' && payload.catalog_id) {
-            adSetParams.promoted_object = {
-                ...(adSetParams.promoted_object || {}),
-                product_catalog_id: payload.catalog_id,
-                product_set_id: payload.catalog_id, // Will use default product set
+            const campaignResult = await metaApiPost(`/${adAccountId}/campaigns`, accessToken, {
+                name: payload.campaign_name,
+                objective: mapObjective(payload.objective),
+                status: 'PAUSED',
+                special_ad_categories: [],
+            });
+
+            if (!campaignResult.success) {
+                throw new Error(`Failed to create campaign: ${campaignResult.error}`);
+            }
+
+            results.meta_campaign_id = campaignResult.data.id;
+            createdResources.push({ type: 'campaign', id: results.meta_campaign_id });
+            console.log('[CreateCampaign] Campaign created:', results.meta_campaign_id);
+
+            // ─── Step 2: Create Ad Creative ─────────────────────────────
+
+            const creativeParams: Record<string, any> = {
+                name: `${payload.campaign_name} - Creative`,
             };
-        }
 
-        const adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+            const websiteUrl = payload.brief?.website_url || 'https://example.com';
 
-        if (!adSetResult.success) {
-            // Cleanup: delete the campaign we just created
-            console.warn('[CreateCampaign] Ad Set failed, cleaning up campaign...');
-            await metaApiPost(`/${results.meta_campaign_id}`, accessToken, { status: 'DELETED' });
+            if (payload.asset_type === 'upload' && payload.assets.length > 0) {
+                const primaryAsset = payload.assets[0];
+                const isVideo = primaryAsset.file_type?.startsWith('video');
 
-            return new Response(
-                JSON.stringify({
-                    error: `Failed to create ad set: ${adSetResult.error}`,
-                    step: 'adset',
-                    campaign_id_created: results.meta_campaign_id
-                }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        results.meta_adset_id = adSetResult.data.id;
-        console.log('[CreateCampaign] Ad Set created:', results.meta_adset_id);
-
-        // ─── Step 3: Create Ad Creative ─────────────────────────────
-
-        const creativeParams: Record<string, any> = {
-            name: `${payload.campaign_name} - Creative`,
-        };
-
-        if (payload.asset_type === 'upload' && payload.assets.length > 0) {
-            // Use the first image/video asset for the creative
-            const primaryAsset = payload.assets[0];
-            const isVideo = primaryAsset.file_type?.startsWith('video');
-
-            if (isVideo) {
-                // For video creatives - we need to upload video to Meta first via URL
-                creativeParams.object_story_spec = {
-                    page_id: pageId,
-                    video_data: {
-                        video_url: primaryAsset.file_url,
-                        title: payload.campaign_name,
-                        message: payload.description || payload.campaign_name,
-                        call_to_action: {
-                            type: 'SHOP_NOW',
-                            value: {
-                                link: payload.brief?.website_url || 'https://example.com',
+                if (isVideo) {
+                    creativeParams.object_story_spec = {
+                        page_id: pageId,
+                        video_data: {
+                            video_url: primaryAsset.file_url,
+                            title: payload.campaign_name,
+                            message: payload.description || payload.campaign_name,
+                            call_to_action: {
+                                type: 'SHOP_NOW',
+                                value: { link: websiteUrl },
                             },
                         },
-                    },
-                };
-            } else {
-                // For image creatives
-                creativeParams.object_story_spec = {
-                    page_id: pageId,
-                    link_data: {
-                        image_url: primaryAsset.file_url,
-                        link: payload.brief?.website_url || 'https://example.com',
-                        message: payload.description || payload.campaign_name,
-                        name: payload.campaign_name,
-                        call_to_action: {
-                            type: 'SHOP_NOW',
+                    };
+                } else {
+                    creativeParams.object_story_spec = {
+                        page_id: pageId,
+                        link_data: {
+                            image_url: primaryAsset.file_url,
+                            link: websiteUrl,
+                            message: payload.description || payload.campaign_name,
+                            name: payload.campaign_name,
+                            call_to_action: { type: 'SHOP_NOW' },
                         },
-                    },
-                };
-            }
+                    };
+                }
 
-            // If multiple assets, create carousel
-            if (payload.assets.length > 1 && !isVideo) {
-                const childAttachments = payload.assets.slice(0, 10).map((asset) => ({
-                    link: payload.brief?.website_url || 'https://example.com',
-                    image_url: asset.file_url,
-                    name: asset.file_name.replace(/\.[^/.]+$/, ''),
-                    call_to_action: { type: 'SHOP_NOW' },
-                }));
+                if (payload.assets.length > 1 && !isVideo) {
+                    const childAttachments = payload.assets.slice(0, 10).map((asset) => ({
+                        link: websiteUrl,
+                        image_url: asset.file_url,
+                        name: asset.file_name.replace(/\.[^/.]+$/, ''),
+                        call_to_action: { type: 'SHOP_NOW' },
+                    }));
 
+                    creativeParams.object_story_spec = {
+                        page_id: pageId,
+                        link_data: {
+                            link: websiteUrl,
+                            message: payload.description || payload.campaign_name,
+                            child_attachments: childAttachments,
+                        },
+                    };
+                }
+            } else if (payload.asset_type === 'catalog' && payload.catalog_id) {
+                creativeParams.product_set_id = payload.catalog_id;
                 creativeParams.object_story_spec = {
                     page_id: pageId,
-                    link_data: {
-                        link: payload.brief?.website_url || 'https://example.com',
-                        message: payload.description || payload.campaign_name,
-                        child_attachments: childAttachments,
+                    template_data: {
+                        message: payload.description || 'Check out our products!',
+                        link: websiteUrl,
+                        call_to_action: { type: 'SHOP_NOW' },
                     },
                 };
             }
-        } else if (payload.asset_type === 'catalog' && payload.catalog_id) {
-            // Catalog/DPA creative
-            creativeParams.product_set_id = payload.catalog_id;
-            creativeParams.object_story_spec = {
-                page_id: pageId,
-                template_data: {
-                    message: payload.description || 'Check out our products!',
-                    link: payload.brief?.website_url || 'https://example.com',
-                    call_to_action: { type: 'SHOP_NOW' },
-                },
-            };
-        }
 
-        const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
+            const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
 
-        if (!creativeResult.success) {
-            // Cleanup
-            console.warn('[CreateCampaign] Creative failed, cleaning up...');
-            await metaApiPost(`/${results.meta_adset_id}`, accessToken, { status: 'DELETED' });
-            await metaApiPost(`/${results.meta_campaign_id}`, accessToken, { status: 'DELETED' });
+            if (!creativeResult.success) {
+                throw new Error(`Failed to create ad creative: ${creativeResult.error}`);
+            }
+
+            results.meta_creative_id = creativeResult.data.id;
+            createdResources.push({ type: 'creative', id: results.meta_creative_id });
+            console.log('[CreateCampaign] Creative created:', results.meta_creative_id);
+
+            // ─── Step 3: Create Ad Sets & Ads (T.O.S Logic) ──────────────
+
+            const isTestMode = payload.agent_mode === 'TEST_MODE';
+            const numVariations = isTestMode ? 3 : 1;
+
+            console.log(`[CreateCampaign] Creating ${numVariations} ad set/ad variations...`);
+
+            for (let i = 1; i <= numVariations; i++) {
+                const variationSuffix = isTestMode ? `- Test ${i}` : '';
+
+                // Create Ad Set
+                const targeting = buildTargeting(payload.brief || {});
+                const adSetParams: Record<string, any> = {
+                    campaign_id: results.meta_campaign_id,
+                    name: `${payload.campaign_name} - Ad Set ${variationSuffix}`.trim(),
+                    billing_event: 'IMPRESSIONS',
+                    optimization_goal: mapOptimizationGoal(payload.goal, payload.objective),
+                    daily_budget: budgetToCents(payload.daily_budget),
+                    start_time: formatMetaDateTime(payload.start_time),
+                    targeting: targeting,
+                    status: 'PAUSED',
+                };
+
+                if (payload.end_time) {
+                    adSetParams.end_time = formatMetaDateTime(payload.end_time);
+                }
+
+                if (meta_connection.pixel_id) {
+                    adSetParams.promoted_object = { pixel_id: meta_connection.pixel_id };
+                }
+
+                if (payload.asset_type === 'catalog' && payload.catalog_id) {
+                    adSetParams.promoted_object = {
+                        ...(adSetParams.promoted_object || {}),
+                        product_catalog_id: payload.catalog_id,
+                        product_set_id: payload.catalog_id,
+                    };
+                }
+
+                const adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+
+                if (!adSetResult.success) {
+                    throw new Error(`Failed to create ad set variation ${i}: ${adSetResult.error}`);
+                }
+
+                const adsetId = adSetResult.data.id;
+                results.meta_adset_ids.push(adsetId);
+                createdResources.push({ type: 'adset', id: adsetId });
+                console.log(`[CreateCampaign] Ad Set ${i} created:`, adsetId);
+
+                // Create Ad
+                const adResult = await metaApiPost(`/${adAccountId}/ads`, accessToken, {
+                    name: `${payload.campaign_name} - Ad ${variationSuffix}`.trim(),
+                    adset_id: adsetId,
+                    creative: { creative_id: results.meta_creative_id },
+                    status: 'PAUSED',
+                });
+
+                if (!adResult.success) {
+                    throw new Error(`Failed to create ad variation ${i}: ${adResult.error}`);
+                }
+
+                const adId = adResult.data.id;
+                results.meta_ad_ids.push(adId);
+                createdResources.push({ type: 'ad', id: adId });
+                console.log(`[CreateCampaign] Ad ${i} created:`, adId);
+            }
+
+            // ─── Step 4: Update local DB with Meta IDs ──────────────────
+
+            const { error: updateError } = await supabase
+                .from('campaigns')
+                .update({
+                    meta_campaign_id: results.meta_campaign_id,
+                    meta_adset_id: results.meta_adset_ids[0], // Store primary ID for simple reference
+                    meta_creative_id: results.meta_creative_id,
+                    meta_ad_id: results.meta_ad_ids[0], // Store primary ID for simple reference
+                    status: 'paused',
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', payload.campaign_id)
+                .eq('user_id', payload.user_id);
+
+            if (updateError) {
+                console.warn('[CreateCampaign] Failed to update local DB (campaign still created on Meta):', updateError);
+            }
+
+            console.log('[CreateCampaign] ✅ Full campaign created successfully!', results);
 
             return new Response(
                 JSON.stringify({
-                    error: `Failed to create ad creative: ${creativeResult.error}`,
-                    step: 'creative'
+                    success: true,
+                    message: `Campaign created successfully with ${numVariations} variations! Status: PAUSED`,
+                    data: {
+                        ...results,
+                        meta_adset_id: results.meta_adset_ids[0], // Backwards compat
+                        meta_ad_id: results.meta_ad_ids[0], // Backwards compat
+                    },
                 }),
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+
+        } catch (error: any) {
+            console.error('[CreateCampaign] Fatal error:', error.message);
+            await cleanupResources();
+            return new Response(
+                JSON.stringify({ error: error.message || 'Internal server error' }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
-        results.meta_creative_id = creativeResult.data.id;
-        console.log('[CreateCampaign] Creative created:', results.meta_creative_id);
-
-        // ─── Step 4: Create Ad ──────────────────────────────────────
-
-        const adResult = await metaApiPost(`/${adAccountId}/ads`, accessToken, {
-            name: `${payload.campaign_name} - Ad`,
-            adset_id: results.meta_adset_id,
-            creative: { creative_id: results.meta_creative_id },
-            status: 'PAUSED',
-        });
-
-        if (!adResult.success) {
-            // Cleanup
-            console.warn('[CreateCampaign] Ad failed, cleaning up...');
-            await metaApiPost(`/${results.meta_creative_id}`, accessToken, { status: 'DELETED' });
-            await metaApiPost(`/${results.meta_adset_id}`, accessToken, { status: 'DELETED' });
-            await metaApiPost(`/${results.meta_campaign_id}`, accessToken, { status: 'DELETED' });
-
-            return new Response(
-                JSON.stringify({
-                    error: `Failed to create ad: ${adResult.error}`,
-                    step: 'ad'
-                }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        results.meta_ad_id = adResult.data.id;
-        console.log('[CreateCampaign] Ad created:', results.meta_ad_id);
-
-        // ─── Step 5: Update local DB with Meta IDs ──────────────────
-
-        const { error: updateError } = await supabase
-            .from('campaigns')
-            .update({
-                meta_campaign_id: results.meta_campaign_id,
-                meta_adset_id: results.meta_adset_id,
-                meta_creative_id: results.meta_creative_id,
-                meta_ad_id: results.meta_ad_id,
-                status: 'paused',
-                updated_at: new Date().toISOString(),
-            })
-            .eq('id', payload.campaign_id)
-            .eq('user_id', payload.user_id);
-
-        if (updateError) {
-            console.warn('[CreateCampaign] Failed to update local DB (campaign still created on Meta):', updateError);
-        }
-
-        console.log('[CreateCampaign] ✅ Full campaign created successfully!', results);
-
-        return new Response(
-            JSON.stringify({
-                success: true,
-                message: 'Campaign created successfully on Meta! Status: PAUSED',
-                data: results,
-            }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-
-    } catch (error) {
-        console.error('[CreateCampaign] Fatal error:', error);
+    } catch (error: any) {
+        console.error('[CreateCampaign] Fatal outer error:', error.message);
         return new Response(
             JSON.stringify({ error: error.message || 'Internal server error' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

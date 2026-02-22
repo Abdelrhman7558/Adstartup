@@ -183,37 +183,36 @@ export async function fetchMetaConnection(userId: string): Promise<MetaConnectio
 }
 
 /**
- * Fetch client brief data for a user from client_briefs table
+ * Fetch client brief data for a user from user_briefs table
  */
 export async function fetchClientBrief(userId: string): Promise<Partial<ClientBriefData> | null> {
     try {
-        console.log('[MetaAdsAgent] Fetching client brief for user:', userId);
+        console.log('[MetaAdsAgent] Fetching latest user brief for user:', userId);
 
         const { data, error } = await supabase
-            .from('client_briefs')
-            .select('*')
+            .from('user_briefs')
+            .select('data')
             .eq('user_id', userId)
-            .order('created_at', { ascending: false })
+            .order('version_number', { ascending: false })
             .limit(1)
             .maybeSingle();
 
         if (error) {
-            console.error('[MetaAdsAgent] Error fetching client brief:', error);
+            console.error('[MetaAdsAgent] Error fetching user brief:', error);
             return null;
         }
 
-        if (!data) {
-            console.warn('[MetaAdsAgent] No client brief found for user');
+        if (!data || !data.data) {
+            console.warn('[MetaAdsAgent] No user brief found for user');
             return null;
         }
 
-        console.log('[MetaAdsAgent] Client brief fetched:', data.business_name || 'Unknown business');
+        console.log('[MetaAdsAgent] User brief fetched');
 
-        // Return all brief fields (excluding id, user_id, timestamps)
-        const { id, user_id, created_at, updated_at, ...briefData } = data;
-        return briefData as Partial<ClientBriefData>;
+        // The data is stored in the 'data' JSONB column in user_briefs
+        return data.data as Partial<ClientBriefData>;
     } catch (err) {
-        console.error('[MetaAdsAgent] Exception fetching client brief:', err);
+        console.error('[MetaAdsAgent] Exception fetching user brief:', err);
         return null;
     }
 }
@@ -379,6 +378,13 @@ export async function buildAgentPayload(
             agent_mode: 'TEST_MODE',
             timestamp: new Date().toISOString(),
         };
+
+        // If brief is not empty, map fields if necessary
+        if (payload.brief) {
+            // Ensure fields match what's expected by the agent
+            // (e.g., website_url vs websiteUrl if stored differently in JSON)
+            // For now, we assume the JSON structure matches or is close enough.
+        }
 
         console.log('[MetaAdsAgent] Payload built successfully:', {
             campaign_name: payload.campaign_name,
