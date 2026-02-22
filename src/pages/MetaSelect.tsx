@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, AlertCircle, Loader2, ChevronRight, ChevronLeft, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { validateUserId, logWebhookCall, WebhookValidationError } from '../lib/webhookUtils';
+import { supabase } from '../lib/supabase';
 
 interface AdAccount {
   id: string;
@@ -164,36 +165,21 @@ export default function MetaSelect() {
     try {
       const validatedUserId = validateUserId(userId || undefined);
 
-      const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/pages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: validatedUserId }),
-      });
+      const { data, error } = await supabase.functions.invoke('get-pages');
 
-      if (!response.ok) throw new Error('Failed to fetch pages');
-      const result = await response.json();
-      const data = Array.isArray(result) ? result[0] : result;
+      if (error) throw new Error(error.message || 'Failed to fetch pages');
 
-      if (!data || (!data.pages && !data.error)) {
-        throw new Error('Pages not yet ready. Ensure n8n is set to "Respond to Webhook".');
-      }
-
-      // STRICT ARRAY CHECK to prevent crashes
-      const pagesArray = Array.isArray(data.pages) ? data.pages : [];
-      if (data.pages && !Array.isArray(data.pages)) {
-        console.warn('Received non-array pages data:', data.pages);
-      }
+      const pagesArray = Array.isArray(data?.data) ? data.data.map((p: any) => ({
+        id: p.page_id || p.id,
+        name: p.page_name || p.name,
+      })) : [];
 
       setPages(pagesArray);
-      logWebhookCall('POST', 'pages', validatedUserId, true);
+      logWebhookCall('POST', 'get-pages', validatedUserId, true);
       return pagesArray.length > 0;
     } catch (err) {
-      if (err instanceof WebhookValidationError) {
-        console.error('[fetchPages] Validation error:', err.message);
-      } else {
-        console.error('Error fetching pages:', err);
-      }
-      logWebhookCall('POST', 'pages', userId || 'MISSING', false, { error: String(err) });
+      console.error('Error fetching pages:', err);
+      logWebhookCall('POST', 'get-pages', userId || 'MISSING', false, { error: String(err) });
       return false;
     }
   };
@@ -202,36 +188,18 @@ export default function MetaSelect() {
     try {
       const validatedUserId = validateUserId(userId || undefined);
 
-      const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/meta-ad-accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: validatedUserId }),
-      });
+      const { data, error } = await supabase.functions.invoke('get-ad-accounts');
 
-      if (!response.ok) throw new Error('Failed to fetch ad accounts');
-      const result = await response.json();
-      const data = Array.isArray(result) ? result[0] : result;
+      if (error) throw new Error(error.message || 'Failed to fetch ad accounts');
 
-      if (!data || (!data.ad_accounts && !data.error)) {
-        throw new Error('Ad Accounts not yet ready. Ensure n8n is set to "Respond to Webhook".');
-      }
-
-      // STRICT ARRAY CHECK
-      const accountsArray = Array.isArray(data.ad_accounts) ? data.ad_accounts : [];
-      if (data.ad_accounts && !Array.isArray(data.ad_accounts)) {
-        console.warn('Received non-array ad_accounts data:', data.ad_accounts);
-      }
+      const accountsArray = Array.isArray(data?.data) ? data.data : [];
 
       setAdAccounts(accountsArray);
-      logWebhookCall('POST', 'meta-ad-accounts', validatedUserId, true);
+      logWebhookCall('POST', 'get-ad-accounts', validatedUserId, true);
       return accountsArray.length > 0;
     } catch (err) {
-      if (err instanceof WebhookValidationError) {
-        console.error('[fetchAdAccounts] Validation error:', err.message);
-      } else {
-        console.error('Error fetching ad accounts:', err);
-      }
-      logWebhookCall('POST', 'meta-ad-accounts', userId || 'MISSING', false, { error: String(err) });
+      console.error('Error fetching ad accounts:', err);
+      logWebhookCall('POST', 'get-ad-accounts', userId || 'MISSING', false, { error: String(err) });
       return false;
     }
   };
@@ -240,36 +208,20 @@ export default function MetaSelect() {
     try {
       const validatedUserId = validateUserId(userId || undefined);
 
-      const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/meta-all-pixels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: validatedUserId, ad_account_id: selectedAdAccount || '' }),
+      const { data, error } = await supabase.functions.invoke('get-pixels', {
+        body: { ad_account_id: selectedAdAccount || '' },
       });
 
-      if (!response.ok) throw new Error('Failed to fetch pixels');
-      const result = await response.json();
-      const data = Array.isArray(result) ? result[0] : result;
+      if (error) throw new Error(error.message || 'Failed to fetch pixels');
 
-      if (!data || (!data.pixels && !data.error)) {
-        throw new Error('Pixels not yet ready. Ensure n8n is set to "Respond to Webhook".');
-      }
-
-      // STRICT ARRAY CHECK
-      const pixelsArray = Array.isArray(data.pixels) ? data.pixels : [];
-      if (data.pixels && !Array.isArray(data.pixels)) {
-        console.warn('Received non-array pixels data:', data.pixels);
-      }
+      const pixelsArray = Array.isArray(data?.data) ? data.data : [];
 
       setPixels(pixelsArray);
-      logWebhookCall('POST', 'meta-all-pixels', validatedUserId, true);
+      logWebhookCall('POST', 'get-pixels', validatedUserId, true);
       return pixelsArray.length > 0;
     } catch (err) {
-      if (err instanceof WebhookValidationError) {
-        console.error('[fetchPixels] Validation error:', err.message);
-      } else {
-        console.error('Error fetching pixels:', err);
-      }
-      logWebhookCall('POST', 'meta-all-pixels', userId || 'MISSING', false, { error: String(err) });
+      console.error('Error fetching pixels:', err);
+      logWebhookCall('POST', 'get-pixels', userId || 'MISSING', false, { error: String(err) });
       return false;
     }
   };
@@ -278,36 +230,18 @@ export default function MetaSelect() {
     try {
       const validatedUserId = validateUserId(userId || undefined);
 
-      const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/meta-all-catalogs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: validatedUserId }),
-      });
+      const { data, error } = await supabase.functions.invoke('get-catalogs');
 
-      if (!response.ok) throw new Error('Failed to fetch catalogs');
-      const result = await response.json();
-      const data = Array.isArray(result) ? result[0] : result;
+      if (error) throw new Error(error.message || 'Failed to fetch catalogs');
 
-      if (!data || (!data.catalogs && !data.error)) {
-        throw new Error('Catalogs not yet ready. Ensure n8n is set to "Respond to Webhook".');
-      }
-
-      // STRICT ARRAY CHECK
-      const catalogsArray = Array.isArray(data.catalogs) ? data.catalogs : [];
-      if (data.catalogs && !Array.isArray(data.catalogs)) {
-        console.warn('Received non-array catalogs data:', data.catalogs);
-      }
+      const catalogsArray = Array.isArray(data?.data) ? data.data : [];
 
       setCatalogs(catalogsArray);
-      logWebhookCall('POST', 'meta-all-catalogs', validatedUserId, true);
+      logWebhookCall('POST', 'get-catalogs', validatedUserId, true);
       return catalogsArray.length > 0;
     } catch (err) {
-      if (err instanceof WebhookValidationError) {
-        console.error('[fetchCatalogs] Validation error:', err.message);
-      } else {
-        console.error('Error fetching catalogs:', err);
-      }
-      logWebhookCall('POST', 'meta-all-catalogs', userId || 'MISSING', false, { error: String(err) });
+      console.error('Error fetching catalogs:', err);
+      logWebhookCall('POST', 'get-catalogs', userId || 'MISSING', false, { error: String(err) });
       return false;
     }
   };
@@ -439,7 +373,7 @@ export default function MetaSelect() {
             <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
             <p className="text-gray-400">
               {countdown > 0
-                ? `Waiting for n8n... Retrying in ${countdown}s`
+                ? `Loading... Retrying in ${countdown}s`
                 : "Fetching Meta assets..."}
             </p>
           </div>
@@ -452,7 +386,7 @@ export default function MetaSelect() {
             >
               Retry Connection
             </button>
-            <p className="text-[10px] text-gray-600 mt-4 uppercase tracking-widest">Tip: Ensure n8n workflow is set to "Wait for response"</p>
+            <p className="text-[10px] text-gray-600 mt-4 uppercase tracking-widest">Tip: Make sure your Meta account is connected</p>
           </div>
         ) : (
           (items || []).map((item: any) => (

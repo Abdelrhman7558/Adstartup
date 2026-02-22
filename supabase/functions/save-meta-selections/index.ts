@@ -147,20 +147,35 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Also update meta_connections with page and catalog data
+    // Fetch access_token from meta_account_selections so we can store it in meta_connections too
+    let savedAccessToken: string | null = null;
+    const { data: selectionWithToken } = await supabase
+      .from('meta_account_selections')
+      .select('access_token')
+      .eq('user_id', targetUserId)
+      .maybeSingle();
+    savedAccessToken = selectionWithToken?.access_token || null;
+
+    // Also update meta_connections with page, catalog data AND access_token
+    const metaConnectionData: Record<string, any> = {
+      user_id: targetUserId,
+      ad_account_id: payload.ad_account_id,
+      pixel_id: payload.pixel_id || null,
+      page_id: payload.page_id || null,
+      page_name: payload.page_name || null,
+      catalog_id: payload.catalog_id || null,
+      catalog_name: payload.catalog_name || null,
+      is_connected: true,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (savedAccessToken) {
+      metaConnectionData.access_token = savedAccessToken;
+    }
+
     const { error: connectionError } = await supabase
       .from('meta_connections')
-      .upsert({
-        user_id: targetUserId,
-        ad_account_id: payload.ad_account_id,
-        pixel_id: payload.pixel_id || null,
-        page_id: payload.page_id || null,
-        page_name: payload.page_name || null,
-        catalog_id: payload.catalog_id || null,
-        catalog_name: payload.catalog_name || null,
-        is_connected: true,
-        updated_at: new Date().toISOString(),
-      }, {
+      .upsert(metaConnectionData, {
         onConflict: 'user_id'
       });
 
@@ -170,57 +185,7 @@ Deno.serve(async (req: Request) => {
       // Log it but continue
     }
 
-    const webhookPayload = {
-      user_id: targetUserId,
-      brief_id: payload.brief_id || null,
-      page_id: payload.page_id || null,
-      page_name: payload.page_name || null,
-      ad_account_id: payload.ad_account_id,
-      ad_account_name: payload.ad_account_name,
-      pixel_id: payload.pixel_id || null,
-      pixel_name: payload.pixel_name || null,
-      catalog_id: payload.catalog_id || null,
-      catalog_name: payload.catalog_name || null,
-      brief_data: briefData
-    };
-
-    try {
-      console.log('Sending data to n8n webhook...');
-      const webhookResponse = await fetch(
-        'https://n8n.srv1181726.hstgr.cloud/webhook-test/meta-save-selection',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(webhookPayload)
-        }
-      );
-
-      if (!webhookResponse.ok) {
-        throw new Error(`Webhook failed with status: ${webhookResponse.status}`);
-      }
-
-      const webhookResult = await webhookResponse.json();
-      console.log('Webhook success:', webhookResult);
-
-      await supabase
-        .from('meta_account_selections')
-        .update({
-          webhook_submitted: true,
-          webhook_response: webhookResult
-        })
-        .eq('id', selectionData.id);
-
-    } catch (webhookError) {
-      console.error('Webhook error:', webhookError);
-      // Return error to frontend so it doesn't redirect
-      return new Response(
-        JSON.stringify({ error: 'Failed to send data to external webhook. Please try again.' }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
+    // Return success — data is saved to meta_account_selections and meta_connections
     return new Response(
       JSON.stringify({ success: true, data: selectionData }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -228,7 +193,7 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error('Error in save-meta-selections:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
+      JSON.stringify({ error: (error as Error).message || 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

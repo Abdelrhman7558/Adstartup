@@ -37,14 +37,26 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Try meta_connections first
     const { data: metaConnection, error: metaError } = await supabase
       .from('meta_connections')
       .select('access_token, ad_account_id')
       .eq('user_id', user.id)
-      .eq('is_connected', true)
       .maybeSingle();
 
-    if (metaError || !metaConnection?.access_token) {
+    let accessToken = metaConnection?.access_token;
+
+    // Fallback: check meta_account_selections (token stored after OAuth)
+    if (!accessToken) {
+      const { data: metaSelection } = await supabase
+        .from('meta_account_selections')
+        .select('access_token')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      accessToken = metaSelection?.access_token;
+    }
+
+    if (!accessToken) {
       return new Response(
         JSON.stringify({ error: 'Meta not connected. Please connect your Meta account first.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -52,7 +64,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const metaResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me/accounts?access_token=${metaConnection.access_token}&fields=id,name,access_token`
+      `https://graph.facebook.com/v18.0/me/accounts?access_token=${accessToken}&fields=id,name,access_token`
     );
 
     if (!metaResponse.ok) {

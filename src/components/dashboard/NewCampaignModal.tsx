@@ -4,7 +4,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { campaignAssetsService } from '../../lib/campaignAssetsService';
-import { sendCampaignToWebhook, sendCampaignIdWebhook } from '../../lib/webhookService';
+import { sendCampaignIdWebhook } from '../../lib/webhookService';
+import { buildAgentPayload, createMetaCampaign, CampaignFormData } from '../../lib/metaAdsAgentService';
 import { isManagerPlanUser } from '../../lib/managerPlanService';
 
 interface MetaAccount {
@@ -402,61 +403,51 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
         await new Promise(resolve => setTimeout(resolve, 1500)); // Show message for 1.5s
       }
 
-      // Prepare webhook payload with exact fields requested
-      setStatusMessage('Preparing data...');
-      const webhookPayload: any = {
-        user_id: user.id,
+      // ── Meta Ads Agent: Aggregate all data & send to agent ──
+      setStatusMessage('Gathering Meta connection & brief data...');
+
+      const campaignFormData: CampaignFormData = {
         campaign_id: campaignData.id,
         campaign_name: campaignName,
-        objective: objective,
-        goal: goal,
-        Currency: currency,
-        Daily_Budget: Number(dailyBudget),
-        Start_time: startTime,
-        End_time: endTime || null,
-        Type: assetType === 'catalog' ? 'Catalog' : 'assets',
-        Page_id: selectedPageId,
-        timestamp: new Date().toISOString(),
+        objective,
+        goal,
+        daily_budget: Number(dailyBudget),
+        currency,
+        start_time: startTime,
+        end_time: endTime || null,
+        description,
+        offer: offer || null,
+        asset_type: assetType as 'catalog' | 'upload',
+        selected_catalog_id: selectedCatalogId || undefined,
+        selected_catalog_name: selectedCatalogName || undefined,
+        selected_page_id: selectedPageId || undefined,
+        selected_page_name: selectedPageName || undefined,
+        account_id: isManagerPlanUser(user.email) && selectedAccountId ? selectedAccountId : undefined,
+        account_name: isManagerPlanUser(user.email) && selectedAccountName ? selectedAccountName : undefined,
       };
 
-      // Add catalog info if applicable
-      if (assetType === 'catalog' && selectedCatalogId) {
-        webhookPayload.catalog_id = selectedCatalogId;
-        webhookPayload.catalog_name = selectedCatalogName;
+      // Build the full agent payload (pulls meta_connections, client_briefs, assets from DB)
+      const { payload: agentPayload, error: buildError } = await buildAgentPayload(user.id, campaignFormData);
+
+      if (buildError || !agentPayload) {
+        throw new Error(buildError || 'Failed to build agent payload');
       }
 
-      // Add assets info if applicable
-      if (assetType === 'upload') {
-        // Add count of uploaded assets
-        webhookPayload.assets_count = uploadedFilesDetails.length;
+      console.log('Agent payload built:', {
+        campaign_name: agentPayload.campaign_name,
+        ad_account_id: agentPayload.meta_connection.ad_account_id,
+        has_brief: Object.keys(agentPayload.brief).length > 0,
+        assets_count: agentPayload.assets.length,
+        agent_mode: agentPayload.agent_mode,
+      });
 
-        if (uploadedAssetIds.length > 0) {
-          webhookPayload.assets_ids = uploadedAssetIds;
-        }
-        if (uploadedFilesDetails.length > 0) {
-          webhookPayload.files = uploadedFilesDetails;
-        }
+      setStatusMessage('Creating campaign on Meta...');
+      const agentResult = await createMetaCampaign(agentPayload);
+      if (!agentResult.success) {
+        throw new Error(agentResult.error || 'Failed to create campaign on Meta');
       }
 
-      // Add offer if provided
-      if (offer) {
-        webhookPayload.Offer = offer;
-      }
-
-      // Manager Plan: Add Account Info
-      if (isManagerPlanUser(user.email) && selectedAccountId) {
-        webhookPayload.account_id = selectedAccountId;
-        webhookPayload.account_name = selectedAccountName;
-      }
-
-      console.log('Sending campaign to webhook:', webhookPayload);
-      console.log('Payload Files:', webhookPayload.files);
-
-      setStatusMessage('Sending to webhook...');
-      const webhookResult = await sendCampaignToWebhook(webhookPayload);
-      if (!webhookResult.success) {
-        throw new Error(`Webhook failed: ${webhookResult.error}`);
-      }
+      console.log('Campaign created on Meta:', agentResult.data);
 
       setStatusMessage('Done!');
       resetForm();

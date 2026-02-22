@@ -38,30 +38,55 @@ Deno.serve(async (req: Request) => {
     }
 
     const url = new URL(req.url);
-    const adAccountId = url.searchParams.get('ad_account_id');
+    let adAccountId = url.searchParams.get('ad_account_id');
 
-    if (!adAccountId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing ad_account_id parameter' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Also accept ad_account_id from POST body
+    if (!adAccountId && req.method === 'POST') {
+      try {
+        const body = await req.json();
+        adAccountId = body.ad_account_id || null;
+      } catch { /* no body */ }
     }
 
     const { data: metaConnection, error: metaError } = await supabase
       .from('meta_connections')
-      .select('access_token')
+      .select('access_token, ad_account_id')
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (metaError || !metaConnection?.access_token) {
+    let accessToken = metaConnection?.access_token;
+
+    // Fallback: check meta_account_selections (token stored after OAuth)
+    if (!accessToken) {
+      const { data: metaSelection } = await supabase
+        .from('meta_account_selections')
+        .select('access_token')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      accessToken = metaSelection?.access_token;
+    }
+
+    if (!accessToken) {
       return new Response(
         JSON.stringify({ error: 'No Meta connection found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // Fall back to the ad_account_id from meta_connections if not provided
+    if (!adAccountId) {
+      adAccountId = metaConnection?.ad_account_id || null;
+    }
+
+    if (!adAccountId) {
+      return new Response(
+        JSON.stringify({ error: 'Missing ad_account_id. Please select an ad account first.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const metaResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${adAccountId}/adspixels?access_token=${metaConnection.access_token}&fields=id,name,last_fired_time`
+      `https://graph.facebook.com/v18.0/${adAccountId}/adspixels?access_token=${accessToken}&fields=id,name,last_fired_time`
     );
 
     if (!metaResponse.ok) {
