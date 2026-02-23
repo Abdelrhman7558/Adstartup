@@ -56,7 +56,12 @@ Deno.serve(async (req: Request) => {
         const parts = stateString.split(':');
         const userId = parts[0];
         const timestamp = parseInt(parts[1]);
-        const origin = parts[2]?.split('__')[0]; // Split optional __manager flag
+
+        // Reassemble the origin since it contains a colon (e.g., https://example.com)
+        let origin = parts.slice(2).join(':');
+        if (origin) {
+          origin = origin.split('__')[0]; // Split optional __manager flag
+        }
 
         decodedState = { userId, timestamp };
         if (origin && origin.startsWith('http')) {
