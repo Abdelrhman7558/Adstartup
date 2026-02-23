@@ -81,7 +81,9 @@ Deno.serve(async (req: Request) => {
     // ─── Phase 2: Token Exchange ─────────────────────────────────────
 
     // 1. Exchange 'code' for short-lived token
-    const callbackUrl = `${url.origin}${url.pathname}`;
+    // The redirect URI must EXACTLY match the one used during the frontend's auth request.
+    // We hardcode it here because req.url inside the Edge function might reflect an internal gateway URL.
+    const callbackUrl = 'https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback';
     const tokenUrl = `https://graph.facebook.com/${FB_API_VERSION}/oauth/access_token?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(callbackUrl)}&client_secret=${META_APP_SECRET}&code=${code}`;
 
     const shortTokenRes = await fetch(tokenUrl);
@@ -89,7 +91,8 @@ Deno.serve(async (req: Request) => {
 
     if (!shortTokenRes.ok) {
       console.error("[OAuth] Short token exchange failed:", shortTokenData);
-      return Response.redirect(`${redirectBase}?error=token_exchange_failed`, 302);
+      const details = shortTokenData.error?.message || JSON.stringify(shortTokenData);
+      return Response.redirect(`${redirectBase}?error=token_exchange_failed&details=${encodeURIComponent(details)}`, 302);
     }
 
     const shortToken = shortTokenData.access_token;
@@ -102,7 +105,8 @@ Deno.serve(async (req: Request) => {
 
     if (!longTokenRes.ok) {
       console.error("[OAuth] Long token exchange failed:", longTokenData);
-      return Response.redirect(`${redirectBase}?error=long_token_failed`, 302);
+      const details = longTokenData.error?.message || JSON.stringify(longTokenData);
+      return Response.redirect(`${redirectBase}?error=long_token_failed&details=${encodeURIComponent(details)}`, 302);
     }
 
     const longToken = longTokenData.access_token;
