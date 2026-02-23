@@ -31,7 +31,8 @@ export default function MetaCallback() {
           setErrorMsg('Meta connection was canceled. You can try again at any time.');
           setStatus('cancelled');
         } else {
-          setErrorMsg('We could not complete the Meta connection. Please try again.');
+          const details = searchParams.get('details');
+          setErrorMsg(`We could not complete the Meta connection. Please try again. (${errorParam}${details ? `: ${details}` : ''})`);
           setStatus('error');
         }
         return;

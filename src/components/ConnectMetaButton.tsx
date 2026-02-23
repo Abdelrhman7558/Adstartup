@@ -43,7 +43,7 @@ export default function ConnectMetaButton({
       const stateContent = `${validatedUserId}:${Date.now()}:${window.location.origin}`;
       const state = btoa(stateContent);
 
-      const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${state}&response_type=code`;
+      const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${encodeURIComponent(state)}&response_type=code`;
 
       window.location.href = oauthUrl;
     } catch (error) {

@@ -95,7 +95,7 @@ export default function Dashboard() {
 
     window.location.href = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
-    )}&scope=${encodeURIComponent(scope)}&state=${state}&response_type=code`;
+    )}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}&response_type=code`;
   };
 
   const handleSignOut = async () => {

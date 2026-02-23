@@ -262,7 +262,7 @@ export default function MetaAccountsManager({ isOpen, onClose }: MetaAccountsMan
                                 const state = btoa(stateContent);
 
                                 const scope = 'ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management';
-                                window.location.href = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}&response_type=code`;
+                                window.location.href = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}&response_type=code`;
                             }}
                             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all"
                         >

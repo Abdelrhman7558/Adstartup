@@ -47,7 +47,9 @@ Deno.serve(async (req: Request) => {
     try {
       // Handle URL-encoded base64 if necessary
       const decodedUrlState = decodeURIComponent(state);
-      const stateString = atob(decodedUrlState);
+      // Spaces in base64 mean '+' was incorrectly decoded or unencoded in transit
+      const fixedBase64 = decodedUrlState.replace(/ /g, '+');
+      const stateString = atob(fixedBase64);
 
       // Handle "USER_ID:TIMESTAMP:ORIGIN" format
       if (stateString.includes(':')) {
