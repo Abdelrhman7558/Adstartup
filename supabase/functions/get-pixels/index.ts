@@ -85,14 +85,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Ensure the ad account ID has the 'act_' prefix if it's strictly numeric
+    let formattedAdAccountId = adAccountId;
+    if (/^\d+$/.test(adAccountId)) {
+      formattedAdAccountId = `act_${adAccountId}`;
+    }
+
+    console.log(`[get-pixels] Fetching pixels for Ad Account: ${formattedAdAccountId}`);
+
     const metaResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${adAccountId}/adspixels?access_token=${accessToken}&fields=id,name,last_fired_time`
+      `https://graph.facebook.com/v19.0/${formattedAdAccountId}/adspixels?access_token=${accessToken}&fields=id,name,last_fired_time`
     );
 
     if (!metaResponse.ok) {
       const errorData = await metaResponse.json();
+      console.error('[get-pixels] Meta API Error Response:', JSON.stringify(errorData));
       return new Response(
-        JSON.stringify({ error: errorData.error?.message || 'Failed to fetch pixels' }),
+        JSON.stringify({ error: errorData.error?.message || 'Failed to fetch pixels', details: errorData }),
         { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
