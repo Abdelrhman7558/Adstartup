@@ -83,6 +83,7 @@ Deno.serve(async (req: Request) => {
       .from('Accounts')
       .select('Pixels')
       .eq('User ID', user.id)
+      .limit(1)
       .maybeSingle();
 
     if (accountError) {
