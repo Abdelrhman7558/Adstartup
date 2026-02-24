@@ -214,7 +214,7 @@ Deno.serve(async (req: Request) => {
         if (!authHeader) {
             return new Response(
                 JSON.stringify({ error: 'Missing Authorization header' }),
-                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
@@ -224,7 +224,7 @@ Deno.serve(async (req: Request) => {
         if (authError || !user) {
             return new Response(
                 JSON.stringify({ error: 'Invalid authorization token' }),
-                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
@@ -234,7 +234,7 @@ Deno.serve(async (req: Request) => {
             console.log('[CreateCampaign] Raw payload received length:', payloadRaw.length);
         } catch (e) {
             console.error('[CreateCampaign] Failed to read request text:', e);
-            throw new Error('Failed to read request body');
+            return new Response(JSON.stringify({ error: 'Failed to read request body' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
         let payload: CampaignPayload;
@@ -249,7 +249,7 @@ Deno.serve(async (req: Request) => {
                 webhook_response: { error: 'JSON Parse Error', details: errStr, raw: payloadRaw.substring(0, 1000) },
                 updated_at: new Date().toISOString()
             }, { onConflict: 'user_id' });
-            throw new Error('Invalid JSON payload');
+            return new Response(JSON.stringify({ error: 'Invalid JSON payload' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
         // Validate required fields
@@ -257,13 +257,13 @@ Deno.serve(async (req: Request) => {
         if (!meta_connection?.ad_account_id) {
             return new Response(
                 JSON.stringify({ error: 'Missing ad_account_id. Please connect your Meta account first.' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
         if (!meta_connection?.access_token) {
             return new Response(
                 JSON.stringify({ error: 'Missing access token. Please reconnect your Meta account.' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
@@ -507,16 +507,16 @@ Deno.serve(async (req: Request) => {
             console.error('[CreateCampaign] Fatal error:', error.message);
             await cleanupResources();
             return new Response(
-                JSON.stringify({ error: error.message || 'Internal server error' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                JSON.stringify({ success: false, error: error.message || 'Internal server error' }),
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
     } catch (error: any) {
         console.error('[CreateCampaign] Fatal outer error:', error.message);
         return new Response(
-            JSON.stringify({ error: error.message || 'Internal server error' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            JSON.stringify({ success: false, error: error.message || 'Internal server error' }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }
 });
