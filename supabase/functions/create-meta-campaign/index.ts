@@ -313,7 +313,7 @@ Deno.serve(async (req: Request) => {
                 name: payload.campaign_name,
                 objective: mapObjective(payload.objective),
                 status: 'PAUSED',
-                special_ad_categories: [],
+                special_ad_categories: ['NONE'],
             });
 
             if (!campaignResult.success) {
