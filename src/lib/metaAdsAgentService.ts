@@ -430,19 +430,66 @@ export async function createMetaCampaign(payload: MetaAdsAgentPayload): Promise<
             asset_type: payload.asset_type,
         });
 
-        const { data, error } = await supabase.functions.invoke('create-meta-campaign', {
-            body: payload,
-        });
+        // Get current session token
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
 
-        if (error) {
-            console.error('[MetaAdsAgent] Edge function error:', error);
+        if (!accessToken) {
             return {
                 success: false,
-                error: error.message || 'Failed to create campaign on Meta',
+                error: 'Session expired. Please log in again.',
             };
         }
 
-        if (data?.error) {
+        // Call the Edge Function directly via fetch to get full error details
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/create-meta-campaign`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+                'apikey': anonKey,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const responseText = await response.text();
+        console.log('[MetaAdsAgent] Edge function response status:', response.status);
+        console.log('[MetaAdsAgent] Edge function response body:', responseText);
+
+        let data: any;
+        try {
+            data = JSON.parse(responseText);
+        } catch {
+            return {
+                success: false,
+                error: `Server returned unexpected response (status ${response.status}): ${responseText.substring(0, 200)}`,
+            };
+        }
+
+        if (!response.ok) {
+            console.error('[MetaAdsAgent] Edge function HTTP error:', response.status, data);
+            // Try to extract detailed error info
+            let errorMsg = data?.error || data?.message || `Server error (status ${response.status})`;
+            if (data?.error?.message) errorMsg = data.error.message;
+            if (data?.error?.error_user_msg) errorMsg += ` — ${data.error.error_user_msg}`;
+            return {
+                success: false,
+                error: errorMsg,
+            };
+        }
+
+        if (data?.success === false) {
+            console.error('[MetaAdsAgent] Campaign creation failed:', data.error);
+            return {
+                success: false,
+                error: data.error || 'Campaign creation failed',
+            };
+        }
+
+        if (data?.error && typeof data.error === 'string') {
             console.error('[MetaAdsAgent] Meta API error:', data.error);
             return {
                 success: false,

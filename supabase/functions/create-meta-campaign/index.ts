@@ -304,6 +304,64 @@ Deno.serve(async (req: Request) => {
             has_brief: Object.keys(payload.brief || {}).length > 0,
         });
 
+        // ─── Step 0: Verify access token is valid ───────────────────
+        console.log('[CreateCampaign] Step 0 - Verifying access token...');
+        try {
+            const verifyUrl = `${META_API_BASE}/me?access_token=${accessToken}`;
+            const verifyResp = await fetch(verifyUrl);
+            const verifyData = await verifyResp.json();
+            console.log('[CreateCampaign] Token verify result:', JSON.stringify(verifyData));
+
+            if (verifyData.error) {
+                // Save debug data 
+                await supabase.from('meta_account_selections').upsert({
+                    user_id: user.id,
+                    webhook_response: {
+                        debug_step: 'token_verify',
+                        error: verifyData.error,
+                        timestamp: new Date().toISOString()
+                    },
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+
+                return new Response(
+                    JSON.stringify({ success: false, error: `Access token invalid: ${verifyData.error.message}. Please reconnect your Meta account.` }),
+                    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                );
+            }
+        } catch (verifyErr: any) {
+            console.warn('[CreateCampaign] Token verification failed:', verifyErr?.message);
+        }
+
+        // ─── Verify ad account access ───────────────────────────────
+        console.log('[CreateCampaign] Step 0b - Verifying ad account access...');
+        try {
+            const acctUrl = `${META_API_BASE}/${adAccountId}?access_token=${accessToken}&fields=name,account_status,currency`;
+            const acctResp = await fetch(acctUrl);
+            const acctData = await acctResp.json();
+            console.log('[CreateCampaign] Ad account verify result:', JSON.stringify(acctData));
+
+            if (acctData.error) {
+                await supabase.from('meta_account_selections').upsert({
+                    user_id: user.id,
+                    webhook_response: {
+                        debug_step: 'account_verify',
+                        ad_account_id: adAccountId,
+                        error: acctData.error,
+                        timestamp: new Date().toISOString()
+                    },
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+
+                return new Response(
+                    JSON.stringify({ success: false, error: `Ad account error: ${acctData.error.message}` }),
+                    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                );
+            }
+        } catch (acctErr: any) {
+            console.warn('[CreateCampaign] Ad account verification failed:', acctErr?.message);
+        }
+
         const results: Record<string, any> = {
             meta_campaign_id: null,
             meta_adset_ids: [],
@@ -326,6 +384,27 @@ Deno.serve(async (req: Request) => {
         }
 
         try {
+            // ─── Pre-flight: Validate page_id ──────────────────────────
+            if (!pageId) {
+                console.error('[CreateCampaign] FATAL: pageId is missing. Cannot create ad creative without a Facebook Page.');
+                await supabase.from('meta_account_selections').upsert({
+                    user_id: user.id,
+                    webhook_response: {
+                        debug_step: 'preflight_validation',
+                        error: 'Missing page_id',
+                        payload_page_id: payload.page_id,
+                        meta_connection_page_id: meta_connection.page_id,
+                        timestamp: new Date().toISOString()
+                    },
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+
+                return new Response(
+                    JSON.stringify({ success: false, error: 'Missing Facebook Page. Please select a Page in Step 5 or reconnect your Meta account.' }),
+                    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                );
+            }
+
             // ─── Step 1: Create Campaign ────────────────────────────────
 
             console.log('[CreateCampaign] Step 1 - Creating Meta campaign with:', {
@@ -338,11 +417,25 @@ Deno.serve(async (req: Request) => {
                 name: payload.campaign_name,
                 objective: mapObjective(payload.objective),
                 status: 'PAUSED',
-                special_ad_categories: [],
+                special_ad_categories: ['NONE'],
             });
 
+            // Save debug data for every campaign creation attempt
+            await supabase.from('meta_account_selections').upsert({
+                user_id: user.id,
+                webhook_response: {
+                    debug_step: 'step1_campaign_creation',
+                    ad_account_id: adAccountId,
+                    campaign_name: payload.campaign_name,
+                    objective: mapObjective(payload.objective),
+                    result: campaignResult,
+                    timestamp: new Date().toISOString()
+                },
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+
             if (!campaignResult.success) {
-                throw new Error(`Failed to create campaign: ${campaignResult.error}`);
+                throw new Error(`[Step 1 - Campaign] ${campaignResult.error}`);
             }
 
             results.meta_campaign_id = campaignResult.data.id;
@@ -358,7 +451,13 @@ Deno.serve(async (req: Request) => {
             const websiteUrl = payload.brief?.website_url || 'https://example.com';
 
             if (payload.asset_type === 'upload' && payload.assets.length > 0) {
-                const primaryAsset = payload.assets[0];
+                // Filter out assets with empty/missing URLs
+                const validAssets = payload.assets.filter((a) => a.file_url && a.file_url.trim() !== '');
+                if (validAssets.length === 0) {
+                    throw new Error('[Step 2 - Creative] All uploaded assets have empty URLs. Please re-upload your files.');
+                }
+
+                const primaryAsset = validAssets[0];
                 const isVideo = primaryAsset.file_type?.startsWith('video');
 
                 if (isVideo) {
@@ -374,21 +473,9 @@ Deno.serve(async (req: Request) => {
                             },
                         },
                     };
-                } else {
-                    creativeParams.object_story_spec = {
-                        page_id: pageId,
-                        link_data: {
-                            image_url: primaryAsset.file_url,
-                            link: websiteUrl,
-                            message: payload.description || payload.campaign_name,
-                            name: payload.campaign_name,
-                            call_to_action: { type: 'SHOP_NOW' },
-                        },
-                    };
-                }
-
-                if (payload.assets.length > 1 && !isVideo) {
-                    const childAttachments = payload.assets.slice(0, 10).map((asset) => ({
+                } else if (validAssets.length >= 2) {
+                    // Carousel ad: 2+ images
+                    const childAttachments = validAssets.slice(0, 10).map((asset) => ({
                         link: websiteUrl,
                         image_url: asset.file_url,
                         name: asset.file_name.replace(/\.[^/.]+$/, ''),
@@ -401,6 +488,18 @@ Deno.serve(async (req: Request) => {
                             link: websiteUrl,
                             message: payload.description || payload.campaign_name,
                             child_attachments: childAttachments,
+                        },
+                    };
+                } else {
+                    // Single image ad
+                    creativeParams.object_story_spec = {
+                        page_id: pageId,
+                        link_data: {
+                            image_url: primaryAsset.file_url,
+                            link: websiteUrl,
+                            message: payload.description || payload.campaign_name,
+                            name: payload.campaign_name,
+                            call_to_action: { type: 'SHOP_NOW' },
                         },
                     };
                 }
@@ -416,10 +515,30 @@ Deno.serve(async (req: Request) => {
                 };
             }
 
+            // Debug: log full creative params before sending
+            console.log('[CreateCampaign] Step 2 - Creative params:', JSON.stringify(creativeParams, null, 2));
+
             const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
 
+            // Save step 2 debug data
+            await supabase.from('meta_account_selections').upsert({
+                user_id: user.id,
+                webhook_response: {
+                    debug_step: 'step2_creative_creation',
+                    creative_params_keys: Object.keys(creativeParams),
+                    has_object_story_spec: !!creativeParams.object_story_spec,
+                    page_id: pageId,
+                    asset_type: payload.asset_type,
+                    valid_assets_count: payload.asset_type === 'upload' ? payload.assets.filter((a: any) => a.file_url).length : 0,
+                    website_url: websiteUrl,
+                    result: creativeResult,
+                    timestamp: new Date().toISOString()
+                },
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+
             if (!creativeResult.success) {
-                throw new Error(`Failed to create ad creative: ${creativeResult.error}`);
+                throw new Error(`[Step 2 - Creative] ${creativeResult.error}`);
             }
 
             results.meta_creative_id = creativeResult.data.id;
@@ -465,10 +584,23 @@ Deno.serve(async (req: Request) => {
                     };
                 }
 
+                console.log(`[CreateCampaign] Step 3.${i} - Ad set params:`, JSON.stringify(adSetParams, null, 2));
+
                 const adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
 
                 if (!adSetResult.success) {
-                    throw new Error(`Failed to create ad set variation ${i}: ${adSetResult.error}`);
+                    // Save ad set debug data
+                    await supabase.from('meta_account_selections').upsert({
+                        user_id: user.id,
+                        webhook_response: {
+                            debug_step: `step3_adset_${i}`,
+                            adset_params: adSetParams,
+                            result: adSetResult,
+                            timestamp: new Date().toISOString()
+                        },
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'user_id' });
+                    throw new Error(`[Step 3 - Ad Set ${i}] ${adSetResult.error}`);
                 }
 
                 const adsetId = adSetResult.data.id;
@@ -485,7 +617,7 @@ Deno.serve(async (req: Request) => {
                 });
 
                 if (!adResult.success) {
-                    throw new Error(`Failed to create ad variation ${i}: ${adResult.error}`);
+                    throw new Error(`[Step 4 - Ad ${i}] ${adResult.error}`);
                 }
 
                 const adId = adResult.data.id;
