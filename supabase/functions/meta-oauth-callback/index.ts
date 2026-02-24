@@ -10,6 +10,7 @@ const corsHeaders = {
 interface OAuthState {
   userId: string;
   timestamp: number;
+  isManagerOption?: boolean;
 }
 
 const META_APP_ID = "891623109984411";
@@ -57,13 +58,15 @@ Deno.serve(async (req: Request) => {
         const userId = parts[0];
         const timestamp = parseInt(parts[1]);
 
-        // Reassemble the origin since it contains a colon (e.g., https://example.com)
         let origin = parts.slice(2).join(':');
+        let isManagerOption = false;
         if (origin) {
-          origin = origin.split('__')[0]; // Split optional __manager flag
+          const split = origin.split('__');
+          origin = split[0];
+          if (split.length > 1 && split[1] === 'manager') isManagerOption = true;
         }
 
-        decodedState = { userId, timestamp };
+        decodedState = { userId, timestamp, isManagerOption };
         if (origin && origin.startsWith('http')) {
           redirectBase = `${origin}/meta-callback`;
         }
@@ -197,7 +200,12 @@ Deno.serve(async (req: Request) => {
     console.log(`[OAuth] Discovery complete. Found ${results.ad_accounts.length} accounts, ${results.pixels.length} pixels, ${results.catalogs.length} catalogs.`);
 
     // ─── Final Redirect ──────────────────────────────────────────────
-    return Response.redirect(`${redirectBase}?meta_connected=true&user_id=${userId}`, 302);
+    let finalRedirect = `${redirectBase}?meta_connected=true&user_id=${userId}`;
+    if (decodedState.isManagerOption) {
+      finalRedirect += '&mode=manager';
+    }
+
+    return Response.redirect(finalRedirect, 302);
 
   } catch (err: any) {
     console.error("[OAuth] Global callback error:", err.stack);

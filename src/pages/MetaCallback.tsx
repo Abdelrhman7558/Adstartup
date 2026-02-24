@@ -18,8 +18,9 @@ export default function MetaCallback() {
       if (searchParams.get('meta_connected') === 'true') {
         setStatus('success');
         const userId = searchParams.get('user_id') || user?.id;
+        const mode = searchParams.get('mode');
         setTimeout(() => {
-          navigate(`/meta-select?user_id=${userId}`);
+          navigate(`/meta-select?user_id=${userId}${mode ? `&mode=${mode}` : ''}`);
         }, 1500);
         return;
       }
