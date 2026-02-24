@@ -78,38 +78,72 @@ Deno.serve(async (req: Request) => {
       adAccountId = metaConnection?.ad_account_id || null;
     }
 
-    if (!adAccountId) {
-      return new Response(
-        JSON.stringify({ error: 'Missing ad_account_id. Please select an ad account first.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    // Fetch pixels from the 'Accounts' table based on the n8n workflow logic
+    const { data: accountData, error: accountError } = await supabase
+      .from('Accounts')
+      .select('Pixels')
+      .eq('User ID', user.id)
+      .maybeSingle();
+
+    if (accountError) {
+      console.error('[get-pixels] Error querying Accounts table:', accountError);
+    }
+
+    let pixelsArray: any[] = [];
+
+    if (accountData && accountData.Pixels) {
+      try {
+        pixelsArray = JSON.parse(accountData.Pixels);
+        console.log(`[get-pixels] Successfully parsed Pixels from Accounts table for user: ${user.id}`);
+      } catch (e) {
+        console.warn('[get-pixels] Failed to parse Pixels JSON from Accounts table:', e);
+      }
+    }
+
+    // Optional filtering if adAccountId is selected
+    if (pixelsArray.length > 0 && adAccountId) {
+      const filtered = pixelsArray.filter((p: any) => p.account_id === adAccountId || p.ad_account_id === adAccountId);
+      // We only override if it actually matched something, otherwise return the whole list from DB
+      if (filtered.length > 0) {
+        pixelsArray = filtered;
+      }
+    }
+
+    if (pixelsArray.length === 0) {
+      if (!adAccountId) {
+        return new Response(
+          JSON.stringify({ error: 'Missing ad_account_id. Please select an ad account first.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Ensure the ad account ID has the 'act_' prefix if it's strictly numeric
+      let formattedAdAccountId = adAccountId;
+      if (/^\d+$/.test(adAccountId)) {
+        formattedAdAccountId = `act_${adAccountId}`;
+      }
+
+      console.log(`[get-pixels] Fetching pixels from Meta API as fallback for Ad Account: ${formattedAdAccountId}`);
+
+      const metaResponse = await fetch(
+        `https://graph.facebook.com/v19.0/${formattedAdAccountId}/adspixels?access_token=${accessToken}&fields=id,name,last_fired_time`
       );
+
+      if (!metaResponse.ok) {
+        const errorData = await metaResponse.json();
+        console.error('[get-pixels] Meta API Error Response:', JSON.stringify(errorData));
+        return new Response(
+          JSON.stringify({ error: errorData.error?.message || 'Failed to fetch pixels', details: errorData }),
+          { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const metaData = await metaResponse.json();
+      pixelsArray = metaData.data || [];
     }
-
-    // Ensure the ad account ID has the 'act_' prefix if it's strictly numeric
-    let formattedAdAccountId = adAccountId;
-    if (/^\d+$/.test(adAccountId)) {
-      formattedAdAccountId = `act_${adAccountId}`;
-    }
-
-    console.log(`[get-pixels] Fetching pixels for Ad Account: ${formattedAdAccountId}`);
-
-    const metaResponse = await fetch(
-      `https://graph.facebook.com/v19.0/${formattedAdAccountId}/adspixels?access_token=${accessToken}&fields=id,name,last_fired_time`
-    );
-
-    if (!metaResponse.ok) {
-      const errorData = await metaResponse.json();
-      console.error('[get-pixels] Meta API Error Response:', JSON.stringify(errorData));
-      return new Response(
-        JSON.stringify({ error: errorData.error?.message || 'Failed to fetch pixels', details: errorData }),
-        { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const metaData = await metaResponse.json();
 
     return new Response(
-      JSON.stringify({ data: metaData.data || [] }),
+      JSON.stringify({ data: pixelsArray }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
