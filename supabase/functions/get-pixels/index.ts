@@ -92,11 +92,16 @@ Deno.serve(async (req: Request) => {
     let pixelsArray: any[] = [];
 
     if (accountData && accountData.Pixels) {
-      try {
-        pixelsArray = JSON.parse(accountData.Pixels);
-        console.log(`[get-pixels] Successfully parsed Pixels from Accounts table for user: ${user.id}`);
-      } catch (e) {
-        console.warn('[get-pixels] Failed to parse Pixels JSON from Accounts table:', e);
+      if (Array.isArray(accountData.Pixels)) {
+        pixelsArray = accountData.Pixels;
+        console.log(`[get-pixels] Successfully retrieved Pixels array from Accounts table for user: ${user.id}`);
+      } else if (typeof accountData.Pixels === 'string') {
+        try {
+          pixelsArray = JSON.parse(accountData.Pixels);
+          console.log(`[get-pixels] Successfully parsed Pixels string from Accounts table for user: ${user.id}`);
+        } catch (e) {
+          console.warn('[get-pixels] Failed to parse Pixels string from Accounts table:', e);
+        }
       }
     }
 
