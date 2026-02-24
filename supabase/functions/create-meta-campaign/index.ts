@@ -7,7 +7,7 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-const META_API_VERSION = 'v18.0';
+const META_API_VERSION = 'v21.0';
 const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
 
 // ─── Types ──────────────────────────────────────────────────────
@@ -68,31 +68,50 @@ async function metaApiPost(
 
         for (const [key, value] of Object.entries(params)) {
             if (value !== null && value !== undefined) {
-                body.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+                if (Array.isArray(value)) {
+                    // Meta expects arrays as JSON strings, e.g. special_ad_categories=["NONE"]
+                    body.append(key, JSON.stringify(value));
+                } else if (typeof value === 'object') {
+                    body.append(key, JSON.stringify(value));
+                } else {
+                    body.append(key, String(value));
+                }
             }
         }
 
-        console.log(`[MetaAPI] POST ${endpoint}`, Object.keys(params));
+        const bodyStr = body.toString();
+        console.log(`[MetaAPI] POST ${url}`);
+        console.log(`[MetaAPI] Params keys:`, Object.keys(params));
+        // Log the full body for debugging (mask access token)
+        console.log(`[MetaAPI] Body:`, bodyStr.replace(/access_token=[^&]+/, 'access_token=***'));
 
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: body.toString(),
+            body: bodyStr,
         });
 
-        const result = await response.json();
+        const responseText = await response.text();
+        console.log(`[MetaAPI] Response status: ${response.status}, body: ${responseText.substring(0, 500)}`);
+
+        let result: any;
+        try {
+            result = JSON.parse(responseText);
+        } catch {
+            return { success: false, error: `Non-JSON response: ${responseText.substring(0, 200)}` };
+        }
 
         if (!response.ok || result.error) {
-            const errorMsg = result.error?.message || result.error?.error_user_msg || `HTTP ${response.status}`;
-            console.error(`[MetaAPI] Error on ${endpoint}:`, result.error || result);
+            const errorMsg = result.error?.message || result.error?.error_user_msg || JSON.stringify(result.error) || `HTTP ${response.status}`;
+            console.error(`[MetaAPI] Error on ${endpoint}:`, JSON.stringify(result.error || result));
             return { success: false, error: errorMsg };
         }
 
-        console.log(`[MetaAPI] Success on ${endpoint}:`, result.id || result);
+        console.log(`[MetaAPI] Success on ${endpoint}:`, result.id || JSON.stringify(result));
         return { success: true, data: result };
-    } catch (err) {
-        console.error(`[MetaAPI] Exception on ${endpoint}:`, err);
-        return { success: false, error: err.message || 'Network error calling Meta API' };
+    } catch (err: any) {
+        console.error(`[MetaAPI] Exception on ${endpoint}:`, err?.message || err);
+        return { success: false, error: err?.message || 'Network error calling Meta API' };
     }
 }
 
@@ -309,11 +328,17 @@ Deno.serve(async (req: Request) => {
         try {
             // ─── Step 1: Create Campaign ────────────────────────────────
 
+            console.log('[CreateCampaign] Step 1 - Creating Meta campaign with:', {
+                adAccountId,
+                name: payload.campaign_name,
+                objective: mapObjective(payload.objective),
+            });
+
             const campaignResult = await metaApiPost(`/${adAccountId}/campaigns`, accessToken, {
                 name: payload.campaign_name,
                 objective: mapObjective(payload.objective),
                 status: 'PAUSED',
-                special_ad_categories: ['NONE'],
+                special_ad_categories: [],
             });
 
             if (!campaignResult.success) {
