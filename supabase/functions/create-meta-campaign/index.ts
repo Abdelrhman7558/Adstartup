@@ -1,3 +1,4 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 
 const corsHeaders = {
@@ -227,7 +228,29 @@ Deno.serve(async (req: Request) => {
             );
         }
 
-        const payload: CampaignPayload = await req.json();
+        let payloadRaw = '';
+        try {
+            payloadRaw = await req.text();
+            console.log('[CreateCampaign] Raw payload received length:', payloadRaw.length);
+        } catch (e) {
+            console.error('[CreateCampaign] Failed to read request text:', e);
+            throw new Error('Failed to read request body');
+        }
+
+        let payload: CampaignPayload;
+        try {
+            payload = JSON.parse(payloadRaw);
+        } catch (e) {
+            const errStr = String(e);
+            console.error('[CreateCampaign] Failed to parse JSON payload. Raw snippet:', payloadRaw.substring(0, 200));
+            // Log to DB for debugging
+            await supabase.from('meta_account_selections').upsert({
+                user_id: user.id,
+                webhook_response: { error: 'JSON Parse Error', details: errStr, raw: payloadRaw.substring(0, 1000) },
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+            throw new Error('Invalid JSON payload');
+        }
 
         // Validate required fields
         const { meta_connection } = payload;
