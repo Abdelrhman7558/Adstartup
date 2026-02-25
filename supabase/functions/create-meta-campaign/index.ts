@@ -54,7 +54,7 @@ interface CampaignPayload {
     timestamp: string;
 }
 
-// ─── Helper: Call Meta Graph API (JSON body, matching n8n) ──────
+// ─── Helper: Call Meta Graph API (form-urlencoded, standard format) ──────
 
 async function metaApiPost(
     endpoint: string,
@@ -62,21 +62,32 @@ async function metaApiPost(
     params: Record<string, any>
 ): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-        // Send access_token as query param, body as JSON (matching n8n workflow)
-        const url = `${META_API_BASE}${endpoint}?access_token=${encodeURIComponent(accessToken)}`;
-        const jsonBody = JSON.stringify(params);
+        const url = `${META_API_BASE}${endpoint}`;
 
-        console.log(`[MetaAPI] POST ${META_API_BASE}${endpoint}`);
-        console.log(`[MetaAPI] Body:`, jsonBody.substring(0, 1000));
+        // Build form-urlencoded body (Meta API standard)
+        // Nested objects/arrays must be JSON-stringified
+        const formParams = new URLSearchParams();
+        formParams.append('access_token', accessToken);
+        for (const [key, value] of Object.entries(params)) {
+            if (value === null || value === undefined) continue;
+            if (typeof value === 'object') {
+                formParams.append(key, JSON.stringify(value));
+            } else {
+                formParams.append(key, String(value));
+            }
+        }
+
+        console.log(`[MetaAPI] POST ${url}`);
+        console.log(`[MetaAPI] Params:`, Object.fromEntries(formParams.entries()));
 
         const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: jsonBody,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formParams.toString(),
         });
 
         const responseText = await response.text();
-        console.log(`[MetaAPI] Response status: ${response.status}, body: ${responseText.substring(0, 500)}`);
+        console.log(`[MetaAPI] Response status: ${response.status}, body: ${responseText.substring(0, 1000)}`);
 
         let result: any;
         try {
@@ -86,8 +97,14 @@ async function metaApiPost(
         }
 
         if (!response.ok || result.error) {
-            const errorMsg = result.error?.message || result.error?.error_user_msg || JSON.stringify(result.error) || `HTTP ${response.status}`;
-            console.error(`[MetaAPI] Error on ${endpoint}:`, JSON.stringify(result.error || result));
+            // Extract FULL error details including blame_field_specs
+            const errObj = result.error || {};
+            const blameFields = errObj.error_data?.blame_field_specs
+                ? ` [Blame fields: ${JSON.stringify(errObj.error_data.blame_field_specs)}]`
+                : '';
+            const userMsg = errObj.error_user_msg ? ` — ${errObj.error_user_msg}` : '';
+            const errorMsg = `${errObj.message || 'Unknown error'}${userMsg}${blameFields} (code: ${errObj.code || 'N/A'}, subcode: ${errObj.error_subcode || 'N/A'})`;
+            console.error(`[MetaAPI] FULL Error on ${endpoint}:`, JSON.stringify(result.error || result));
             return { success: false, error: errorMsg };
         }
 
@@ -500,7 +517,7 @@ Deno.serve(async (req: Request) => {
                 name: payload.campaign_name,
                 objective: mapObjective(payload.objective),
                 status: 'PAUSED',
-                special_ad_categories: ['NONE'],
+                special_ad_categories: [],
             };
 
             console.log('[CreateCampaign] Step 1 params:', JSON.stringify(campaignParams, null, 2));
