@@ -518,6 +518,7 @@ Deno.serve(async (req: Request) => {
                 objective: mapObjective(payload.objective),
                 status: 'PAUSED',
                 special_ad_categories: [],
+                is_adset_budget_sharing_enabled: false,
             };
 
             console.log('[CreateCampaign] Step 1 params:', JSON.stringify(campaignParams, null, 2));
