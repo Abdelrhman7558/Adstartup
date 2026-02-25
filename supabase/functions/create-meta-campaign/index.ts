@@ -500,16 +500,8 @@ Deno.serve(async (req: Request) => {
                 name: payload.campaign_name,
                 objective: mapObjective(payload.objective),
                 status: 'PAUSED',
-                special_ad_categories: [],
-                campaign_budget_optimization: false,
+                special_ad_categories: ['NONE'],
             };
-
-            if (payload.start_time) {
-                campaignParams.start_time = formatMetaDateTime(payload.start_time);
-            }
-            if (payload.end_time) {
-                campaignParams.end_time = formatMetaDateTime(payload.end_time);
-            }
 
             console.log('[CreateCampaign] Step 1 params:', JSON.stringify(campaignParams, null, 2));
 
