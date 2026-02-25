@@ -663,12 +663,12 @@ Deno.serve(async (req: Request) => {
 
             // ─── Step 3: Create Ad Set (matching n8n Adsets node) ────────
 
+            const metaObjective = mapObjective(payload.objective);
             const targeting = buildTargeting(payload.brief || {});
             const adSetParams: Record<string, any> = {
                 campaign_id: results.meta_campaign_id,
                 name: `${payload.campaign_name} - Ad Set`,
                 billing_event: 'IMPRESSIONS',
-                optimization_goal: 'OFFSITE_CONVERSIONS',
                 bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
                 daily_budget: budgetToCents(payload.daily_budget),
                 status: 'PAUSED',
@@ -681,40 +681,85 @@ Deno.serve(async (req: Request) => {
             }
 
             // ─── Promoted Object (CRITICAL for OUTCOME_SALES) ─────────
-            // For CATALOG campaigns: always use product_catalog_id + product_set_id
-            // For UPLOAD campaigns: use pixel_id if available, otherwise LINK_CLICKS
+            // Meta requires promoted_object for OUTCOME_SALES campaigns.
+            // For CATALOG campaigns: use product_catalog_id + product_set_id
+            // For UPLOAD campaigns: use pixel_id + custom_event_type
+            // If neither is available: fall back to LINK_CLICKS optimization
+            const isSalesObjective = metaObjective === 'OUTCOME_SALES';
+            const isTrafficObjective = metaObjective === 'OUTCOME_TRAFFIC';
+
             if (payload.asset_type === 'catalog' && payload.catalog_id) {
-                adSetParams.promoted_object = {
+                // CATALOG: promoted_object MUST have product_catalog_id AND product_set_id
+                const promotedObject: Record<string, any> = {
                     product_catalog_id: payload.catalog_id,
                 };
                 if (creativeParams.product_set_id) {
-                    adSetParams.promoted_object.product_set_id = creativeParams.product_set_id;
+                    promotedObject.product_set_id = creativeParams.product_set_id;
                 }
+                adSetParams.promoted_object = promotedObject;
+                adSetParams.optimization_goal = 'OFFSITE_CONVERSIONS';
                 console.log('[CreateCampaign] Using CATALOG promoted_object:', JSON.stringify(adSetParams.promoted_object));
             } else if (meta_connection.pixel_id) {
+                // PIXEL: promoted_object with pixel_id
                 adSetParams.promoted_object = {
                     pixel_id: meta_connection.pixel_id,
                     custom_event_type: 'PURCHASE',
                 };
+                adSetParams.optimization_goal = 'OFFSITE_CONVERSIONS';
                 console.log('[CreateCampaign] Using PIXEL promoted_object:', JSON.stringify(adSetParams.promoted_object));
-            } else {
-                // No catalog, no pixel → can't do OFFSITE_CONVERSIONS, switch to LINK_CLICKS
+            } else if (isSalesObjective || isTrafficObjective) {
+                // No catalog, no pixel → can't do OFFSITE_CONVERSIONS
+                // Use LINK_CLICKS which doesn't require promoted_object
                 adSetParams.optimization_goal = 'LINK_CLICKS';
-                console.log('[CreateCampaign] No promoted_object available, using LINK_CLICKS');
+                // For sales without pixel/catalog, add page_id as promoted_object
+                if (pageId) {
+                    adSetParams.promoted_object = { page_id: pageId };
+                    console.log('[CreateCampaign] Using PAGE promoted_object for sales/traffic:', pageId);
+                } else {
+                    console.log('[CreateCampaign] No promoted_object available, using LINK_CLICKS');
+                }
+            } else {
+                // Other objectives (AWARENESS, ENGAGEMENT, etc.)
+                adSetParams.optimization_goal = mapOptimizationGoal(payload.goal, payload.objective);
+                if (meta_connection.pixel_id) {
+                    adSetParams.promoted_object = {
+                        pixel_id: meta_connection.pixel_id,
+                        custom_event_type: 'PURCHASE',
+                    };
+                }
+                console.log('[CreateCampaign] Using optimization_goal:', adSetParams.optimization_goal);
             }
 
             console.log('[CreateCampaign] Step 3 - Ad set params:', JSON.stringify(adSetParams, null, 2));
 
             let adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
 
-            // If first attempt fails, retry with LINK_CLICKS (works for any objective)
+            // If first attempt fails, retry with different strategies
             if (!adSetResult.success) {
-                console.warn('[CreateCampaign] Step 3 first attempt failed, retrying with LINK_CLICKS...');
-                delete adSetParams.promoted_object;
-                adSetParams.optimization_goal = 'LINK_CLICKS';
+                const firstError = adSetResult.error || '';
+                console.warn('[CreateCampaign] Step 3 first attempt failed:', firstError);
 
-                console.log('[CreateCampaign] Step 3 (retry) - Ad set params:', JSON.stringify(adSetParams, null, 2));
-                adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+                // Retry strategy 1: Keep promoted_object but try LINK_CLICKS optimization
+                if (adSetParams.optimization_goal !== 'LINK_CLICKS') {
+                    console.log('[CreateCampaign] Step 3 retry 1: switching to LINK_CLICKS optimization...');
+                    adSetParams.optimization_goal = 'LINK_CLICKS';
+                    adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+                }
+
+                // Retry strategy 2: If still failing, try without promoted_object and with LANDING_PAGE_VIEWS
+                if (!adSetResult.success) {
+                    console.log('[CreateCampaign] Step 3 retry 2: removing promoted_object, using LANDING_PAGE_VIEWS...');
+                    delete adSetParams.promoted_object;
+                    adSetParams.optimization_goal = 'LANDING_PAGE_VIEWS';
+                    adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+                }
+
+                // Retry strategy 3: Last resort - IMPRESSIONS
+                if (!adSetResult.success) {
+                    console.log('[CreateCampaign] Step 3 retry 3: using IMPRESSIONS optimization...');
+                    adSetParams.optimization_goal = 'IMPRESSIONS';
+                    adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+                }
             }
 
             if (!adSetResult.success) {
