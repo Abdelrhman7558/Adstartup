@@ -344,9 +344,18 @@ function budgetToCents(amount: number): number {
 
 // ─── Format datetime for Meta API ───────────────────────────────
 
-function formatMetaDateTime(dt: string): string {
+function formatMetaDateTime(dt: string, isStart = false): string {
     try {
-        return new Date(dt).toISOString();
+        const date = new Date(dt);
+        if (isStart) {
+            const now = new Date();
+            const bufferTime = new Date(now.getTime() + 5 * 60000);
+            if (date <= bufferTime) {
+                console.log(`[MetaAPI] Adjusted start_time from ${date.toISOString()} to ${bufferTime.toISOString()} to avoid past-date error.`);
+                return bufferTime.toISOString();
+            }
+        }
+        return date.toISOString();
     } catch {
         return dt;
     }
@@ -672,7 +681,7 @@ Deno.serve(async (req: Request) => {
                 bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
                 daily_budget: budgetToCents(payload.daily_budget),
                 status: 'PAUSED',
-                start_time: formatMetaDateTime(payload.start_time),
+                start_time: formatMetaDateTime(payload.start_time, true),
                 targeting: targeting,
             };
 
@@ -695,6 +704,11 @@ Deno.serve(async (req: Request) => {
                 };
                 if (creativeParams.product_set_id) {
                     promotedObject.product_set_id = creativeParams.product_set_id;
+                }
+                // When optimizing for OFFSITE_CONVERSIONS, pixel_id and custom_event_type are usually required
+                if (meta_connection.pixel_id) {
+                    promotedObject.pixel_id = meta_connection.pixel_id;
+                    promotedObject.custom_event_type = 'PURCHASE';
                 }
                 adSetParams.promoted_object = promotedObject;
                 adSetParams.optimization_goal = 'OFFSITE_CONVERSIONS';
