@@ -77,7 +77,7 @@ Deno.serve(async (req: Request) => {
 
     // Request the instagram_accounts connected to the page
     const metaResponse = await fetch(
-      `https://graph.facebook.com/v19.0/${selectedPageId}?fields=instagram_accounts{id,username},page_backed_instagram_accounts{id,username}&access_token=${accessToken}`
+      `https://graph.facebook.com/v19.0/${selectedPageId}?fields=instagram_accounts{id,username},page_backed_instagram_accounts{id,username},instagram_business_account{id,username}&access_token=${accessToken}`
     );
 
     if (!metaResponse.ok) {
@@ -119,6 +119,19 @@ Deno.serve(async (req: Request) => {
           type: 'page-backed'
         });
       });
+    }
+
+    // Add instagram_business_account
+    if (metaData.instagram_business_account?.id) {
+      // Find if already exists
+      const exists = instagramAccounts.find(acc => acc.id === metaData.instagram_business_account.id);
+      if (!exists) {
+        instagramAccounts.push({
+          id: metaData.instagram_business_account.id,
+          username: metaData.instagram_business_account.username || `Business Account (${metaData.instagram_business_account.id})`,
+          type: 'business'
+        });
+      }
     }
 
     if (instagramAccounts.length === 0) {

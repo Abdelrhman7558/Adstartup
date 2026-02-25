@@ -265,7 +265,7 @@ async function fetchInstagramActorId(
     const result = await metaApiGet(
         `/${pageId}`,
         accessToken,
-        { fields: 'instagram_accounts{id},page_backed_instagram_accounts{id}' }
+        { fields: 'instagram_accounts{id},page_backed_instagram_accounts{id},instagram_business_account{id}' }
     );
 
     if (!result.success) {
@@ -277,6 +277,13 @@ async function fetchInstagramActorId(
     if (result.data?.instagram_accounts?.data?.length > 0) {
         const id = result.data.instagram_accounts.data[0].id;
         console.log(`[MetaAPI] Found connected Instagram account: ${id}`);
+        return { success: true, instagramActorId: id };
+    }
+
+    // Try instagram_business_account
+    if (result.data?.instagram_business_account?.id) {
+        const id = result.data.instagram_business_account.id;
+        console.log(`[MetaAPI] Found Instagram Business account: ${id}`);
         return { success: true, instagramActorId: id };
     }
 
