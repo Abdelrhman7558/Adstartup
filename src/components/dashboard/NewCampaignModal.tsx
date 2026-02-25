@@ -25,12 +25,18 @@ interface MetaPage {
   page_name: string;
 }
 
+interface MetaInstagram {
+  id: string;
+  username: string;
+  type: string;
+}
+
 interface MetaCatalog {
   catalog_id: string;
   catalog_name: string;
 }
 
-type Step = 1 | 2 | 3 | 4 | 5 | 6;
+type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 const OBJECTIVE_OPTIONS = ['sales'];
 const GOAL_OPTIONS = ['increase sales'];
@@ -69,6 +75,10 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
   const [selectedPageName, setSelectedPageName] = useState('');
   const [pages, setPages] = useState<MetaPage[]>([]);
 
+  const [selectedInstagramId, setSelectedInstagramId] = useState('');
+  const [selectedInstagramName, setSelectedInstagramName] = useState('');
+  const [instagramAccounts, setInstagramAccounts] = useState<MetaInstagram[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
@@ -100,6 +110,8 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
     setEndTime('');
     setSelectedPageId('');
     setSelectedPageName('');
+    setSelectedInstagramId('');
+    setSelectedInstagramName('');
     setError('');
     setSelectedAccountId('');
     setSelectedAccountName('');
@@ -157,6 +169,36 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
       console.error('Failed to load pages:', err);
       setError(err instanceof Error ? err.message : 'Failed to load pages');
       setPages([]);
+    }
+  };
+
+  const loadInstagramAccounts = async (pageId: string) => {
+    if (!user || !pageId) return;
+    setLoading(true);
+    setError('');
+    try {
+      const { data, error } = await supabase.functions.invoke('get-instagram-accounts', {
+        body: { page_id: pageId }
+      });
+
+      if (error) throw error;
+      setInstagramAccounts(data?.data || []);
+
+      // Auto-select if only one
+      if (data?.data?.length === 1) {
+        setSelectedInstagramId(data.data[0].id);
+        setSelectedInstagramName(data.data[0].username);
+      } else {
+        setSelectedInstagramId('');
+        setSelectedInstagramName('');
+      }
+
+    } catch (err) {
+      console.error('Failed to load instagram accounts:', err);
+      // Don't strongly error out on Instagram, just empty the list
+      setInstagramAccounts([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -278,16 +320,25 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
       }
     }
 
+    // Step 5: Page Selection
     if (currentStep === 5) {
       if (!selectedPageId) {
-        setError('Page selection is required');
+        setError('Please select a Meta Page');
         return;
       }
+
+      // Load Instagram accounts for the selected page before moving to step 6
+      await loadInstagramAccounts(selectedPageId);
+    }
+
+    // Step 6: Instagram Selection
+    if (currentStep === 6) {
+      // Optional, but if there are accounts and they didn't pick, you could enforce it or let it pass
+      setError('');
     }
 
     setError('');
-    setError('');
-    if (currentStep < 6) {
+    if (currentStep < 7) { // Changed from 6 to 7
       if (currentStep === 1) {
         // If Manager, go to Step 2 (Account), else skip to Step 3 (Details)
         if (isManagerPlanUser(user?.email)) {
@@ -295,7 +346,10 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
         } else {
           setCurrentStep(3);
         }
-      } else {
+      } else if (currentStep === 5) { // If on Page selection, always go to Instagram selection
+        setCurrentStep(6);
+      }
+      else {
         setCurrentStep((currentStep + 1) as Step);
       }
     }
@@ -310,7 +364,10 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
         } else {
           setCurrentStep(1);
         }
-      } else {
+      } else if (currentStep === 6) { // If on Instagram selection, go back to Page selection
+        setCurrentStep(5);
+      }
+      else {
         setCurrentStep((currentStep - 1) as Step);
       }
     }
@@ -422,6 +479,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
         selected_catalog_name: selectedCatalogName || undefined,
         selected_page_id: selectedPageId || undefined,
         selected_page_name: selectedPageName || undefined,
+        selected_instagram_id: selectedInstagramId || undefined, // Added this line
         account_id: isManagerPlanUser(user.email) && selectedAccountId ? selectedAccountId : undefined,
         account_name: isManagerPlanUser(user.email) && selectedAccountName ? selectedAccountName : undefined,
       };
@@ -492,7 +550,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
             }`}
         >
           <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            New Campaign - Step {currentStep} of 6
+            New Campaign - Step {currentStep} of 7
           </h2>
           <button
             onClick={onClose}
@@ -504,7 +562,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
 
         <div className="flex-1 overflow-y-auto p-6">
           {error && (
-            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-800 rounded-lg">
               <p className="text-sm text-red-800 dark:text-red-200 whitespace-pre-wrap">{error}</p>
             </div>
           )}
@@ -959,7 +1017,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
             <div className="space-y-6">
               <div>
                 <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  Select Page *
+                  Select Facebook Page *
                 </label>
                 <select
                   value={selectedPageId}
@@ -980,12 +1038,54 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
                     </option>
                   ))}
                 </select>
+                <p className="text-xs text-gray-500 mt-2">The page that will be used to run your ads.</p>
               </div>
             </div>
           )}
 
-          {/* STEP 6: Review */}
+          {/* STEP 6: Instagram Selection */}
           {currentStep === 6 && (
+            <div className="space-y-6">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  Select Instagram Account (Optional)
+                </label>
+
+                {instagramAccounts.length === 0 && !loading && (
+                  <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      No connected Instagram accounts found for the selected Facebook page. Your ads will only run on Facebook.
+                    </p>
+                  </div>
+                )}
+
+                <select
+                  value={selectedInstagramId}
+                  onChange={(e) => {
+                    const ig = instagramAccounts.find(i => i.id === e.target.value);
+                    setSelectedInstagramId(e.target.value);
+                    setSelectedInstagramName(ig?.username || '');
+                  }}
+                  disabled={instagramAccounts.length === 0}
+                  className={`w-full px-4 py-3 rounded-xl border ${theme === 'dark'
+                    ? 'bg-gray-700 border-gray-600 text-white'
+                    : 'bg-white border-gray-300 text-gray-900'
+                    } focus:ring-2 focus:ring-blue-500 focus:outline-none opacity-${instagramAccounts.length === 0 ? '50' : '100'}`}
+                >
+                  <option value="">Do not use Instagram / Default to Page</option>
+                  {instagramAccounts.map((ig) => (
+                    <option key={ig.id} value={ig.id}>
+                      {ig.username} ({ig.type})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-2">Explicitly selecting an Instagram account can solve some ad creation errors if Meta requires it.</p>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 7: Review */}
+          {currentStep === 7 && (
             <div className="space-y-4">
               <h3 className={`text-xl font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                 Review Campaign
@@ -1030,10 +1130,19 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
 
                 <div>
                   <p className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                    Selected Page
+                    Selected Facebook Page
                   </p>
                   <p className={`text-base ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     {selectedPageName}
+                  </p>
+                </div>
+
+                <div>
+                  <p className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Selected Instagram Account
+                  </p>
+                  <p className={`text-base ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    {selectedInstagramName || 'None (Default to Page / Facebook Only)'}
                   </p>
                 </div>
               </div>
@@ -1070,14 +1179,14 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
 
           {!loading && (
             <button
-              onClick={currentStep === 6 ? handleSubmit : handleNext}
+              onClick={currentStep === 7 ? handleSubmit : handleNext}
               disabled={loading}
               className={`px-8 py-3 rounded-xl font-medium transition-all shadow-lg shadow-blue-500/20 ${loading
                 ? 'bg-blue-400 cursor-not-allowed'
                 : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white transform hover:scale-[1.02]'
                 }`}
             >
-              {currentStep === 6 ? 'Create Campaign' : 'Next Step'}
+              {currentStep === 7 ? 'Create Campaign' : 'Next Step'}
             </button>
           )}
         </div>

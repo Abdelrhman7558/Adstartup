@@ -19,7 +19,8 @@ interface MetaConnectionData {
     catalog_name: string | null;
     page_id: string | null;
     page_name: string | null;
-    access_token: string;
+    instagram_actor_id?: string | null;
+    access_token: string | null;
 }
 
 interface CampaignPayload {
@@ -48,6 +49,7 @@ interface CampaignPayload {
     catalog_name: string | null;
     page_id: string | null;
     page_name: string | null;
+    selected_instagram_id?: string;
     account_id: string | null;
     account_name: string | null;
     agent_mode: string;
@@ -607,9 +609,15 @@ Deno.serve(async (req: Request) => {
                     throw new Error(`[Step 2 - Creative] ${psResult.error}`);
                 }
 
-                // Fetch Instagram Actor ID
-                const igResult = await fetchInstagramActorId(pageId, accessToken);
-                const instagramActorId = igResult.success ? igResult.instagramActorId : null;
+                // Try to get explicit Instagram Actor ID from payload, or fetch it as fallback
+                let instagramActorId: string | null = payload.selected_instagram_id || payload.meta_connection?.instagram_actor_id || null;
+                if (!instagramActorId) {
+                    console.log('[CreateCampaign] No explicit Instagram Actor ID in payload, fetching implicitly...');
+                    const igResult = await fetchInstagramActorId(pageId, accessToken);
+                    instagramActorId = igResult.success ? (igResult.instagramActorId || null) : null;
+                } else {
+                    console.log(`[CreateCampaign] Using explicit Instagram Actor ID: ${instagramActorId}`);
+                }
 
                 creativeParams.product_set_id = psResult.productSetId;
                 creativeParams.object_story_spec = {
@@ -635,9 +643,15 @@ Deno.serve(async (req: Request) => {
                 const primaryAsset = validAssets[0];
                 const isVideo = primaryAsset.file_type?.startsWith('video');
 
-                // Fetch Instagram Actor ID
-                const igResult = await fetchInstagramActorId(pageId, accessToken);
-                const instagramActorId = igResult.success ? igResult.instagramActorId : null;
+                // Try to get explicit Instagram Actor ID from payload, or fetch it as fallback
+                let instagramActorId: string | null = payload.selected_instagram_id || payload.meta_connection?.instagram_actor_id || null;
+                if (!instagramActorId) {
+                    console.log('[CreateCampaign] No explicit Instagram Actor ID in payload, fetching implicitly...');
+                    const igResult = await fetchInstagramActorId(pageId, accessToken);
+                    instagramActorId = igResult.success ? (igResult.instagramActorId || null) : null;
+                } else {
+                    console.log(`[CreateCampaign] Using explicit Instagram Actor ID: ${instagramActorId}`);
+                }
 
                 if (isVideo) {
                     creativeParams.object_story_spec = {

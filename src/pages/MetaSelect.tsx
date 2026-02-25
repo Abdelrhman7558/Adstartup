@@ -32,7 +32,13 @@ interface Page {
   picture?: string;
 }
 
-type Step = 1 | 2 | 3 | 4 | 5;
+interface InstagramAccount {
+  id: string;
+  username: string;
+  type: string;
+}
+
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
 export default function MetaSelect() {
   // DEBUG: Log immediately on component render
@@ -55,11 +61,13 @@ export default function MetaSelect() {
   const [adAccounts, setAdAccounts] = useState<AdAccount[]>([]);
   const [pixels, setPixels] = useState<Pixel[]>([]);
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
+  const [instagramAccounts, setInstagramAccounts] = useState<InstagramAccount[]>([]);
 
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [selectedAdAccount, setSelectedAdAccount] = useState<string | null>(null);
   const [selectedPixel, setSelectedPixel] = useState<string | null>(null);
   const [selectedCatalog, setSelectedCatalog] = useState<string | null>(null);
+  const [selectedInstagramId, setSelectedInstagramId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -246,12 +254,41 @@ export default function MetaSelect() {
     }
   };
 
+  const fetchInstagramAccounts = async (pageId: string): Promise<boolean> => {
+    try {
+      const validatedUserId = validateUserId(userId || undefined);
+
+      const { data, error } = await supabase.functions.invoke('get-instagram-accounts', {
+        body: { page_id: pageId },
+      });
+
+      if (error) throw new Error(error.message || 'Failed to fetch Instagram accounts');
+
+      const accountsArray = Array.isArray(data?.data) ? data.data : [];
+
+      setInstagramAccounts(accountsArray);
+      logWebhookCall('POST', 'get-instagram-accounts', validatedUserId, true);
+      return accountsArray.length > 0;
+    } catch (err) {
+      console.error('Error fetching Instagram accounts:', err);
+      logWebhookCall('POST', 'get-instagram-accounts', userId || 'MISSING', false, { error: String(err) });
+      return false;
+    }
+  };
+
   const handleNext = async () => {
     setError(null);
 
     if (currentStep === 1 && !selectedPage) {
       setError('Please select a Page');
       return;
+    }
+
+    if (currentStep === 1 && selectedPage) {
+      // Fetch Instagram accounts for the newly selected page
+      setLoading(true);
+      await fetchInstagramAccounts(selectedPage);
+      setLoading(false);
     }
 
     if (currentStep === 2 && !selectedAdAccount) {
@@ -264,7 +301,17 @@ export default function MetaSelect() {
       return;
     }
 
-    if (currentStep < 5) {
+    if (currentStep === 4 && !selectedInstagramId) {
+      setError('Please select an Instagram account (or skip if none available and not advertising on Instagram)');
+      // we allow next if they explicitly clear it, but maybe let's make it optional if array is empty
+      if (instagramAccounts.length > 0 && !selectedInstagramId) {
+        setError('Please select an Instagram account');
+        return;
+      }
+      setError(null);
+    }
+
+    if (currentStep < 6) {
       setCurrentStep((prev) => (prev + 1) as Step);
     }
   };
@@ -292,12 +339,15 @@ export default function MetaSelect() {
       const selectedAdAccountData = adAccounts.find(acc => acc.id === selectedAdAccount);
       const selectedPixelData = pixels.find(pix => pix.id === selectedPixel);
       const selectedCatalogData = catalogs.find(cat => cat.id === selectedCatalog);
+      const selectedInstagramData = instagramAccounts.find(ig => ig.id === selectedInstagramId);
 
       const payload = {
         user_id: validatedUserId,
         brief_id: searchParams.get('briefId') || null,
         page_id: selectedPage,
         page_name: selectedPageData?.name || '',
+        instagram_actor_id: selectedInstagramId || null,
+        instagram_actor_name: selectedInstagramData?.username || null,
         ad_account_id: selectedAdAccount,
         ad_account_name: selectedAdAccountData?.name || '',
         pixel_id: selectedPixel,
@@ -442,16 +492,18 @@ export default function MetaSelect() {
     1: 'Select Meta Page',
     2: 'Select Ad Account',
     3: 'Choose Pixel',
-    4: 'Pick Catalog',
-    5: 'Review Selections',
+    4: 'Instagram Account (Optional)',
+    5: 'Pick Catalog',
+    6: 'Review Selections',
   };
 
   const stepDescriptions = {
     1: 'Choose the Meta Page you want to work with',
     2: 'Choose the ad account you want to work with',
     3: 'Select a pixel to track conversions',
-    4: 'Optionally select a product catalog',
-    5: 'Review and confirm your choices',
+    4: 'Select an Instagram account connected to your page',
+    5: 'Optionally select a product catalog',
+    6: 'Review and confirm your choices',
   };
 
   return (
@@ -461,7 +513,7 @@ export default function MetaSelect() {
         {/* Progress Bar */}
         <div className="mb-12">
           <div className="flex items-center justify-between mb-4">
-            {[1, 2, 3, 4, 5].map((step) => (
+            {[1, 2, 3, 4, 5, 6].map((step) => (
               <div key={step} className="flex flex-col items-center flex-1">
                 <motion.div
                   initial={{ scale: 0 }}
@@ -479,14 +531,15 @@ export default function MetaSelect() {
                   {step === 1 && 'Page'}
                   {step === 2 && 'Account'}
                   {step === 3 && 'Pixel'}
-                  {step === 4 && 'Catalog'}
-                  {step === 5 && 'Review'}
+                  {step === 4 && 'Instagram'}
+                  {step === 5 && 'Catalog'}
+                  {step === 6 && 'Review'}
                 </p>
               </div>
             ))}
           </div>
           <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map((step, index) => (
+            {[1, 2, 3, 4, 5, 6].map((step, index) => (
               <div
                 key={step}
                 className="flex-1"
@@ -589,10 +642,33 @@ export default function MetaSelect() {
               </motion.div>
             )}
 
-            {/* Step 4: Catalogs */}
+            {/* Step 4: Instagram Accounts */}
             {currentStep === 4 && (
               <motion.div
                 key="step4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+              >
+                <SelectionList
+                  items={instagramAccounts.map(ig => ({ ...ig, name: ig.username }))}
+                  selected={selectedInstagramId}
+                  onSelect={setSelectedInstagramId}
+                  onClear={() => setSelectedInstagramId(null)}
+                  isLoading={loading}
+                />
+                {instagramAccounts.length === 0 && !loading && (
+                  <div className="mt-4 p-4 bg-yellow-900/30 border border-yellow-700/50 rounded-xl">
+                    <p className="text-yellow-400 text-sm">No Instagram account found for this page. You can proceed, but ads may only run on Facebook.</p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* Step 5: Catalogs */}
+            {currentStep === 5 && (
+              <motion.div
+                key="step5"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
@@ -607,10 +683,10 @@ export default function MetaSelect() {
               </motion.div>
             )}
 
-            {/* Step 5: Review */}
-            {currentStep === 5 && (
+            {/* Step 6: Review */}
+            {currentStep === 6 && (
               <motion.div
-                key="step5"
+                key="step6"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
@@ -621,6 +697,13 @@ export default function MetaSelect() {
                   value={pages.find(p => p.id === selectedPage)?.name}
                   id={selectedPage}
                   icon="📄"
+                />
+                <ReviewItem
+                  title="Instagram Account"
+                  value={instagramAccounts.find(ig => ig.id === selectedInstagramId)?.username || 'Not selected'}
+                  id={selectedInstagramId}
+                  icon="📸"
+                  optional
                 />
                 <ReviewItem
                   title="Ad Account"
@@ -662,7 +745,7 @@ export default function MetaSelect() {
             Back
           </button>
 
-          {currentStep === 5 ? (
+          {currentStep === 6 ? (
             <button
               onClick={handleSubmit}
               disabled={submitting}
@@ -686,7 +769,8 @@ export default function MetaSelect() {
               disabled={
                 (currentStep === 1 && !selectedPage) ||
                 (currentStep === 2 && !selectedAdAccount) ||
-                (currentStep === 3 && !selectedPixel)
+                (currentStep === 3 && !selectedPixel) ||
+                (currentStep === 4 && instagramAccounts.length > 0 && !selectedInstagramId)
               }
               className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 font-semibold shadow-lg shadow-blue-500/30"
             >

@@ -11,6 +11,8 @@ interface SelectionPayload {
   brief_id?: string;
   page_id?: string;
   page_name?: string;
+  instagram_actor_id?: string;
+  instagram_actor_name?: string;
   ad_account_id: string;
   ad_account_name: string;
   pixel_id?: string;
@@ -125,6 +127,10 @@ Deno.serve(async (req: Request) => {
       .upsert({
         user_id: targetUserId,
         brief_id: payload.brief_id || null,
+        page_id: payload.page_id || null,
+        page_name: payload.page_name || null,
+        instagram_actor_id: payload.instagram_actor_id || null,
+        instagram_actor_name: payload.instagram_actor_name || null,
         ad_account_id: payload.ad_account_id,
         ad_account_name: payload.ad_account_name,
         pixel_id: payload.pixel_id || null,
@@ -163,6 +169,8 @@ Deno.serve(async (req: Request) => {
       pixel_id: payload.pixel_id || null,
       page_id: payload.page_id || null,
       page_name: payload.page_name || null,
+      instagram_actor_id: payload.instagram_actor_id || null,
+      instagram_actor_name: payload.instagram_actor_name || null,
       catalog_id: payload.catalog_id || null,
       catalog_name: payload.catalog_name || null,
       is_connected: true,
