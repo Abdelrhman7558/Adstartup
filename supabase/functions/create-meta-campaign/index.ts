@@ -669,6 +669,7 @@ Deno.serve(async (req: Request) => {
                 name: `${payload.campaign_name} - Ad Set`,
                 billing_event: 'IMPRESSIONS',
                 optimization_goal: 'OFFSITE_CONVERSIONS',
+                bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
                 daily_budget: budgetToCents(payload.daily_budget),
                 status: 'PAUSED',
                 start_time: formatMetaDateTime(payload.start_time),
@@ -679,26 +680,48 @@ Deno.serve(async (req: Request) => {
                 adSetParams.end_time = formatMetaDateTime(payload.end_time);
             }
 
-            // Promoted object — try with pixel first, fallback without if pixel is invalid
+            // Promoted object — pixel-based for conversions tracking
             if (meta_connection.pixel_id) {
                 adSetParams.promoted_object = {
                     pixel_id: meta_connection.pixel_id,
                     custom_event_type: 'PURCHASE',
                 };
+            } else if (payload.asset_type === 'catalog' && payload.catalog_id) {
+                // For catalog campaigns without pixel, use product_catalog_id
+                adSetParams.promoted_object = {
+                    product_catalog_id: payload.catalog_id,
+                };
+                // Also need product_set_id in promoted_object for catalog
+                if (creativeParams.product_set_id) {
+                    adSetParams.promoted_object.product_set_id = creativeParams.product_set_id;
+                }
+            }
+
+            // If no promoted_object at all, switch to LINK_CLICKS (no conversion tracking)
+            if (!adSetParams.promoted_object) {
+                adSetParams.optimization_goal = 'LINK_CLICKS';
             }
 
             console.log('[CreateCampaign] Step 3 - Ad set params:', JSON.stringify(adSetParams, null, 2));
 
             let adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
 
-            // If pixel_id caused an error, retry WITHOUT promoted_object
+            // If pixel_id caused an error, retry with catalog-based promoted_object or without
             if (!adSetResult.success && meta_connection.pixel_id &&
-                (adSetResult.error?.includes('1487429') || adSetResult.error?.includes('pixel') || adSetResult.error?.includes('Pixel'))) {
-                console.warn('[CreateCampaign] Pixel ID rejected, retrying ad set WITHOUT promoted_object...');
-                delete adSetParams.promoted_object;
+                (adSetResult.error?.includes('1487429') || adSetResult.error?.includes('pixel') || adSetResult.error?.includes('Pixel') || adSetResult.error?.includes('البكسل'))) {
+                console.warn('[CreateCampaign] Pixel ID rejected, retrying ad set without pixel...');
 
-                // For sales objective without pixel, switch optimization to LINK_CLICKS
-                adSetParams.optimization_goal = 'LINK_CLICKS';
+                if (payload.asset_type === 'catalog' && payload.catalog_id) {
+                    // Retry with catalog-based promoted_object
+                    adSetParams.promoted_object = { product_catalog_id: payload.catalog_id };
+                    if (creativeParams.product_set_id) {
+                        adSetParams.promoted_object.product_set_id = creativeParams.product_set_id;
+                    }
+                } else {
+                    // Retry without promoted_object, switch to LINK_CLICKS
+                    delete adSetParams.promoted_object;
+                    adSetParams.optimization_goal = 'LINK_CLICKS';
+                }
 
                 console.log('[CreateCampaign] Step 3 (retry) - Ad set params:', JSON.stringify(adSetParams, null, 2));
                 adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
