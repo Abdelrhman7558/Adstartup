@@ -679,7 +679,7 @@ Deno.serve(async (req: Request) => {
                 adSetParams.end_time = formatMetaDateTime(payload.end_time);
             }
 
-            // Promoted object (matching n8n exactly)
+            // Promoted object — try with pixel first, fallback without if pixel is invalid
             if (meta_connection.pixel_id) {
                 adSetParams.promoted_object = {
                     pixel_id: meta_connection.pixel_id,
@@ -689,7 +689,20 @@ Deno.serve(async (req: Request) => {
 
             console.log('[CreateCampaign] Step 3 - Ad set params:', JSON.stringify(adSetParams, null, 2));
 
-            const adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+            let adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+
+            // If pixel_id caused an error, retry WITHOUT promoted_object
+            if (!adSetResult.success && meta_connection.pixel_id &&
+                (adSetResult.error?.includes('1487429') || adSetResult.error?.includes('pixel') || adSetResult.error?.includes('Pixel'))) {
+                console.warn('[CreateCampaign] Pixel ID rejected, retrying ad set WITHOUT promoted_object...');
+                delete adSetParams.promoted_object;
+
+                // For sales objective without pixel, switch optimization to LINK_CLICKS
+                adSetParams.optimization_goal = 'LINK_CLICKS';
+
+                console.log('[CreateCampaign] Step 3 (retry) - Ad set params:', JSON.stringify(adSetParams, null, 2));
+                adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+            }
 
             if (!adSetResult.success) {
                 await supabase.from('meta_account_selections').upsert({
