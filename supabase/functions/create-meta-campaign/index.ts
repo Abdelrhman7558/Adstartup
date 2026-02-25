@@ -560,9 +560,16 @@ Deno.serve(async (req: Request) => {
 
             console.log('[CreateCampaign] Step 1 - Creating Meta campaign...');
 
+            let metaObjective = mapObjective(payload.objective);
+            // Fallback from SALES to TRAFFIC if user has no pixel, because SALES natively requires pixel/app tracking
+            if (metaObjective === 'OUTCOME_SALES' && !meta_connection?.pixel_id) {
+                console.log('[CreateCampaign] User has no pixel_id for OUTCOME_SALES. Falling back to OUTCOME_TRAFFIC.');
+                metaObjective = 'OUTCOME_TRAFFIC';
+            }
+
             const campaignParams: Record<string, any> = {
                 name: payload.campaign_name,
-                objective: mapObjective(payload.objective),
+                objective: metaObjective,
                 status: 'PAUSED',
                 special_ad_categories: [],
                 is_adset_budget_sharing_enabled: false,
@@ -734,7 +741,6 @@ Deno.serve(async (req: Request) => {
 
             // ─── Step 3: Create Ad Set (matching n8n Adsets node) ────────
 
-            const metaObjective = mapObjective(payload.objective);
             const targeting = buildTargeting(payload.brief || {});
             const adSetParams: Record<string, any> = {
                 campaign_id: results.meta_campaign_id,
@@ -797,13 +803,18 @@ Deno.serve(async (req: Request) => {
             } else {
                 // Other objectives (AWARENESS, ENGAGEMENT, etc.)
                 adSetParams.optimization_goal = mapOptimizationGoal(payload.goal, payload.objective);
-                if (meta_connection.pixel_id) {
+                if (meta_connection.pixel_id && isSalesObjective) {
                     adSetParams.promoted_object = {
                         pixel_id: meta_connection.pixel_id,
                         custom_event_type: 'PURCHASE',
                     };
                 }
                 console.log('[CreateCampaign] Using optimization_goal:', adSetParams.optimization_goal);
+            }
+
+            // Always strip OFFSITE_CONVERSIONS if lacking pixel to prevent error
+            if (adSetParams.optimization_goal === 'OFFSITE_CONVERSIONS' && !meta_connection.pixel_id) {
+                adSetParams.optimization_goal = 'LINK_CLICKS';
             }
 
             console.log('[CreateCampaign] Step 3 - Ad set params:', JSON.stringify(adSetParams, null, 2));
@@ -835,6 +846,11 @@ Deno.serve(async (req: Request) => {
                     console.log('[CreateCampaign] Step 3 retry 3: using IMPRESSIONS optimization...');
                     adSetParams.optimization_goal = 'IMPRESSIONS';
                     adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+                }
+
+                // Keep the first error so the user sees the real reason it failed
+                if (!adSetResult.success) {
+                    adSetResult.error = firstError;
                 }
             }
 
