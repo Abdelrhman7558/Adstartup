@@ -252,6 +252,42 @@ async function uploadImageToMeta(
     }
 }
 
+// ─── Helper: Fetch Instagram Actor ID from Page ──────────────────
+
+async function fetchInstagramActorId(
+    pageId: string,
+    accessToken: string
+): Promise<{ success: boolean; instagramActorId?: string; error?: string }> {
+    console.log(`[MetaAPI] Fetching Instagram Actor ID for page: ${pageId}`);
+    // Request the instagram_accounts connected to the page
+    const result = await metaApiGet(
+        `/${pageId}`,
+        accessToken,
+        { fields: 'instagram_accounts{id},page_backed_instagram_accounts{id}' }
+    );
+
+    if (!result.success) {
+        // Fallback: simply don't return an ID, will use page backing
+        return { success: false, error: `Failed to fetch Instagram account: ${result.error}` };
+    }
+
+    // Try connected Instagram account first
+    if (result.data?.instagram_accounts?.data?.length > 0) {
+        const id = result.data.instagram_accounts.data[0].id;
+        console.log(`[MetaAPI] Found connected Instagram account: ${id}`);
+        return { success: true, instagramActorId: id };
+    }
+
+    // Fallback to page-backed Instagram account
+    if (result.data?.page_backed_instagram_accounts?.data?.length > 0) {
+        const id = result.data.page_backed_instagram_accounts.data[0].id;
+        console.log(`[MetaAPI] Found page-backed Instagram account: ${id}`);
+        return { success: true, instagramActorId: id };
+    }
+
+    return { success: false, error: 'No Instagram account connected to this page.' };
+}
+
 // ─── Map objective to Meta API values ───────────────────────────
 
 function mapObjective(objective: string): string {
@@ -571,9 +607,14 @@ Deno.serve(async (req: Request) => {
                     throw new Error(`[Step 2 - Creative] ${psResult.error}`);
                 }
 
+                // Fetch Instagram Actor ID
+                const igResult = await fetchInstagramActorId(pageId, accessToken);
+                const instagramActorId = igResult.success ? igResult.instagramActorId : null;
+
                 creativeParams.product_set_id = psResult.productSetId;
                 creativeParams.object_story_spec = {
                     page_id: pageId,
+                    instagram_actor_id: instagramActorId,
                     template_data: {
                         call_to_action: { type: 'SHOP_NOW' },
                         link: websiteUrl,
@@ -594,9 +635,14 @@ Deno.serve(async (req: Request) => {
                 const primaryAsset = validAssets[0];
                 const isVideo = primaryAsset.file_type?.startsWith('video');
 
+                // Fetch Instagram Actor ID
+                const igResult = await fetchInstagramActorId(pageId, accessToken);
+                const instagramActorId = igResult.success ? igResult.instagramActorId : null;
+
                 if (isVideo) {
                     creativeParams.object_story_spec = {
                         page_id: pageId,
+                        instagram_actor_id: instagramActorId,
                         video_data: {
                             video_url: primaryAsset.file_url,
                             title: payload.campaign_name,
@@ -616,6 +662,7 @@ Deno.serve(async (req: Request) => {
                         // Use image_hash (the reliable way, matching n8n)
                         creativeParams.object_story_spec = {
                             page_id: pageId,
+                            instagram_actor_id: instagramActorId,
                             link_data: {
                                 image_hash: uploadResult.imageHash,
                                 link: websiteUrl,
@@ -630,6 +677,7 @@ Deno.serve(async (req: Request) => {
                         console.warn(`[CreateCampaign] Image upload failed (${uploadResult.error}), falling back to image_url`);
                         creativeParams.object_story_spec = {
                             page_id: pageId,
+                            instagram_actor_id: instagramActorId,
                             link_data: {
                                 image_url: primaryAsset.file_url,
                                 link: websiteUrl,
