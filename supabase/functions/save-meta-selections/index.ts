@@ -159,9 +159,6 @@ Deno.serve(async (req: Request) => {
       selectionData = retryResult.data;
       selectionError = retryResult.error;
     }
-      .select()
-      .single();
-
     if (selectionError) {
       console.error('Error saving selections:', selectionError);
       return new Response(
