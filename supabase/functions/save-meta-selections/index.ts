@@ -122,26 +122,43 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const { data: selectionData, error: selectionError } = await supabase
+    const insertSelectionPayload: any = {
+      user_id: targetUserId,
+      brief_id: payload.brief_id || null,
+      page_id: payload.page_id || null,
+      page_name: payload.page_name || null,
+      instagram_actor_id: payload.instagram_actor_id || null,
+      instagram_actor_name: payload.instagram_actor_name || null,
+      ad_account_id: payload.ad_account_id,
+      ad_account_name: payload.ad_account_name,
+      pixel_id: payload.pixel_id || null,
+      pixel_name: payload.pixel_name || null,
+      catalog_id: payload.catalog_id || null,
+      catalog_name: payload.catalog_name || null,
+      selection_completed: true,
+      updated_at: new Date().toISOString(),
+    };
+
+    let { data: selectionData, error: selectionError } = await supabase
       .from('meta_account_selections')
-      .upsert({
-        user_id: targetUserId,
-        brief_id: payload.brief_id || null,
-        page_id: payload.page_id || null,
-        page_name: payload.page_name || null,
-        instagram_actor_id: payload.instagram_actor_id || null,
-        instagram_actor_name: payload.instagram_actor_name || null,
-        ad_account_id: payload.ad_account_id,
-        ad_account_name: payload.ad_account_name,
-        pixel_id: payload.pixel_id || null,
-        pixel_name: payload.pixel_name || null,
-        catalog_id: payload.catalog_id || null,
-        catalog_name: payload.catalog_name || null,
-        selection_completed: true,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id'
-      })
+      .upsert(insertSelectionPayload, { onConflict: 'user_id' })
+      .select()
+      .maybeSingle();
+
+    // Fallback if instagram_actor_id column does not exist
+    if (selectionError && selectionError.code === '42703') {
+      delete insertSelectionPayload.instagram_actor_id;
+      delete insertSelectionPayload.instagram_actor_name;
+
+      const retryResult = await supabase
+        .from('meta_account_selections')
+        .upsert(insertSelectionPayload, { onConflict: 'user_id' })
+        .select()
+        .maybeSingle();
+
+      selectionData = retryResult.data;
+      selectionError = retryResult.error;
+    }
       .select()
       .single();
 
@@ -181,11 +198,20 @@ Deno.serve(async (req: Request) => {
       metaConnectionData.access_token = savedAccessToken;
     }
 
-    const { error: connectionError } = await supabase
+    let { error: connectionError } = await supabase
       .from('meta_connections')
-      .upsert(metaConnectionData, {
-        onConflict: 'user_id'
-      });
+      .upsert(metaConnectionData, { onConflict: 'user_id' });
+
+    if (connectionError && connectionError.code === '42703') {
+      delete metaConnectionData.instagram_actor_id;
+      delete metaConnectionData.instagram_actor_name;
+
+      const retryResult = await supabase
+        .from('meta_connections')
+        .upsert(metaConnectionData, { onConflict: 'user_id' });
+
+      connectionError = retryResult.error;
+    }
 
     if (connectionError) {
       console.error('Error saving to meta_connections:', connectionError);

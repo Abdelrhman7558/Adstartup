@@ -131,21 +131,26 @@ Deno.serve(async (req: Request) => {
 
       console.log(`[get-pixels] Fetching pixels from Meta API as fallback for Ad Account: ${formattedAdAccountId}`);
 
-      const metaResponse = await fetch(
-        `https://graph.facebook.com/v19.0/${formattedAdAccountId}/adspixels?access_token=${accessToken}&fields=id,name,last_fired_time`
-      );
+      let allPixels: any[] = [];
+      let url: string | null = `https://graph.facebook.com/v19.0/${formattedAdAccountId}/adspixels?access_token=${accessToken}&fields=id,name,last_fired_time&limit=100`;
 
-      if (!metaResponse.ok) {
-        const errorData = await metaResponse.json();
-        console.error('[get-pixels] Meta API Error Response:', JSON.stringify(errorData));
-        return new Response(
-          JSON.stringify({ error: errorData.error?.message || 'Failed to fetch pixels', details: errorData }),
-          { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      while (url) {
+        const metaResponse = await fetch(url);
+
+        if (!metaResponse.ok) {
+          const errorData = await metaResponse.json();
+          console.error('[get-pixels] Meta API Error Response:', JSON.stringify(errorData));
+          return new Response(
+            JSON.stringify({ error: errorData.error?.message || 'Failed to fetch pixels', details: errorData }),
+            { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const metaData = await metaResponse.json();
+        allPixels = allPixels.concat(metaData.data || []);
+        url = metaData.paging?.next || null;
       }
-
-      const metaData = await metaResponse.json();
-      pixelsArray = metaData.data || [];
+      pixelsArray = allPixels;
     }
 
     return new Response(

@@ -63,22 +63,30 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const metaResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me/adaccounts?access_token=${accessToken}&fields=id,name,account_status,currency`
-    );
+    let allAccounts: any[] = [];
+    let url: string | null = `https://graph.facebook.com/v18.0/me/adaccounts?access_token=${accessToken}&fields=id,name,account_status,currency&limit=100`;
 
-    if (!metaResponse.ok) {
-      const errorData = await metaResponse.json();
-      return new Response(
-        JSON.stringify({ error: errorData.error?.message || 'Failed to fetch ad accounts' }),
-        { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    while (url) {
+      const metaResponse = await fetch(url);
+
+      if (!metaResponse.ok) {
+        const errorData = await metaResponse.json();
+        return new Response(
+          JSON.stringify({ error: errorData.error?.message || 'Failed to fetch ad accounts' }),
+          { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const metaData = await metaResponse.json();
+      if (metaData.data && Array.isArray(metaData.data)) {
+        allAccounts = allAccounts.concat(metaData.data);
+      }
+
+      url = metaData.paging?.next || null;
     }
 
-    const metaData = await metaResponse.json();
-
     return new Response(
-      JSON.stringify({ data: metaData.data || [] }),
+      JSON.stringify({ data: allAccounts }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

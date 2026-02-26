@@ -63,27 +63,31 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const metaResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me/businesses?access_token=${accessToken}&fields=id,name,owned_product_catalogs{id,name,product_count}`
-    );
+    let allCatalogs: any[] = [];
+    let url: string | null = `https://graph.facebook.com/v18.0/me/businesses?access_token=${accessToken}&fields=id,name,owned_product_catalogs{id,name,product_count}&limit=100`;
 
-    if (!metaResponse.ok) {
-      const errorData = await metaResponse.json();
-      return new Response(
-        JSON.stringify({ error: errorData.error?.message || 'Failed to fetch catalogs' }),
-        { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    while (url) {
+      const metaResponse = await fetch(url);
 
-    const metaData = await metaResponse.json();
+      if (!metaResponse.ok) {
+        const errorData = await metaResponse.json();
+        return new Response(
+          JSON.stringify({ error: errorData.error?.message || 'Failed to fetch catalogs' }),
+          { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    const allCatalogs: any[] = [];
-    if (metaData.data) {
-      metaData.data.forEach((business: any) => {
-        if (business.owned_product_catalogs?.data) {
-          allCatalogs.push(...business.owned_product_catalogs.data);
-        }
-      });
+      const metaData = await metaResponse.json();
+
+      if (metaData.data) {
+        metaData.data.forEach((business: any) => {
+          if (business.owned_product_catalogs?.data) {
+            allCatalogs.push(...business.owned_product_catalogs.data);
+          }
+        });
+      }
+
+      url = metaData.paging?.next || null;
     }
 
     return new Response(

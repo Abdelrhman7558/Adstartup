@@ -63,34 +63,40 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const metaResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me/accounts?access_token=${accessToken}&fields=id,name,access_token`
-    );
+    let allPages: any[] = [];
+    let url: string | null = `https://graph.facebook.com/v18.0/me/accounts?access_token=${accessToken}&fields=id,name,access_token&limit=100`;
 
-    if (!metaResponse.ok) {
-      const errorData = await metaResponse.json();
+    while (url) {
+      const metaResponse = await fetch(url);
 
-      if (errorData.error?.code === 190) {
+      if (!metaResponse.ok) {
+        const errorData = await metaResponse.json();
+
+        if (errorData.error?.code === 190) {
+          return new Response(
+            JSON.stringify({ error: 'Meta access token expired. Please reconnect your Meta account.' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         return new Response(
-          JSON.stringify({ error: 'Meta access token expired. Please reconnect your Meta account.' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: errorData.error?.message || 'Failed to fetch pages from Meta' }),
+          { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      return new Response(
-        JSON.stringify({ error: errorData.error?.message || 'Failed to fetch pages from Meta' }),
-        { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      const metaData = await metaResponse.json();
+
+      const pages = (metaData.data || []).map((page: any) => ({
+        page_id: page.id,
+        page_name: page.name,
+      }));
+      allPages = allPages.concat(pages);
+
+      url = metaData.paging?.next || null;
     }
 
-    const metaData = await metaResponse.json();
-
-    const pages = (metaData.data || []).map((page: any) => ({
-      page_id: page.id,
-      page_name: page.name,
-    }));
-
-    if (pages.length === 0) {
+    if (allPages.length === 0) {
       return new Response(
         JSON.stringify({
           data: [],
