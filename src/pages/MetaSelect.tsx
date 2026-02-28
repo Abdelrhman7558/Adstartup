@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, AlertCircle, Loader2, ChevronRight, ChevronLeft, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { validateUserId, logWebhookCall, WebhookValidationError } from '../lib/webhookUtils';
+import { logWebhookCall } from '../lib/webhookUtils';
 import { supabase } from '../lib/supabase';
 
 interface AdAccount {
@@ -45,7 +45,7 @@ export default function MetaSelect() {
   console.log('[MetaSelect] Component rendering at:', window.location.href);
 
   const navigate = useNavigate();
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
 
   // DEBUG: Log all search params
@@ -357,36 +357,35 @@ export default function MetaSelect() {
         is_manager_connection: searchParams.get('mode') === 'manager',
       };
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/save-meta-selections`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
-        },
-        body: JSON.stringify(payload),
+      console.log('[MetaSelect] Submitting selections...', payload);
+
+      const { data, error: invokeError } = await supabase.functions.invoke('save-meta-selections', {
+        body: payload,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to save selections');
+      if (invokeError) {
+        console.error('[MetaSelect] Direct invoke error:', invokeError);
+        throw new Error(invokeError.message || 'Failed to communicate with the saving service');
       }
 
-      const result = await response.json();
-      if (result.success || result.data) {
+      if (data?.error) {
+        console.error('[MetaSelect] Edge function logic error:', data.error);
+        throw new Error(data.error);
+      }
+
+      if (data?.success || data?.data) {
         logWebhookCall('POST', 'meta-save-selection', validatedUserId, true);
         setTimeout(() => navigate('/dashboard'), 1500);
       } else {
-        throw new Error('Failed to save selections');
+        throw new Error('Unexpected response format from server');
       }
     } catch (err: any) {
-      if (err instanceof WebhookValidationError) {
-        console.error('[handleSubmit] Validation error:', err.message);
-      } else {
-        console.error('Error submitting selections:', err);
-      }
+      console.error('[MetaSelect] Catch block error:', err);
       logWebhookCall('POST', 'meta-save-selection', userId || 'MISSING', false, { error: err.message });
-      setError(err.message || 'Failed to submit selections');
+
+      // Provide more descriptive error to the user
+      const displayError = err.message || 'An unknown error occurred while saving selections.';
+      setError(displayError);
     } finally {
       setSubmitting(false);
     }
@@ -541,7 +540,7 @@ export default function MetaSelect() {
             ))}
           </div>
           <div className="flex gap-2">
-            {[1, 2, 3, 4, 5, 6].map((step, index) => (
+            {currentStep > step ? (
               <div
                 key={step}
                 className="flex-1"

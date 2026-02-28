@@ -65,6 +65,7 @@ Deno.serve(async (req: Request) => {
 
     let briefData = null;
 
+
     // Only fetch brief if brief_id is provided
     if (payload.brief_id) {
       const { data: fetchedBrief, error: briefError } = await supabase
