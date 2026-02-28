@@ -94,17 +94,28 @@ Deno.serve(async (req: Request) => {
 
     // MANAGER PLAN LOGIC: If this is a manager adding an extra account
     if (payload.is_manager_connection) {
-      // 1. Fetch the access_token from the main selection table (where callback saved it)
-      const { data: existingSelection, error: fetchError } = await supabase
-        .from('meta_account_selections')
+      // 1. Fetch the access_token from the meta_connections table (where callback saved it)
+      const { data: existingConnection, error: fetchError } = await supabase
+        .from('meta_connections')
         .select('access_token')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (fetchError || !existingSelection?.access_token) {
+      if (fetchError || !existingConnection?.access_token) {
         console.error('Error fetching access token for manager connection:', fetchError);
-        // Continue but log error - maybe token expired or missing
-      } else {
+        // Fallback: try to fetch from meta_account_selections just in case
+        const { data: legacySelection } = await supabase
+          .from('meta_account_selections')
+          .select('access_token')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (legacySelection?.access_token) {
+          existingConnection.access_token = legacySelection.access_token;
+        }
+      }
+
+      if (existingConnection?.access_token) {
         // 2. Insert into manager_meta_accounts
         const { error: managerInsertError } = await supabase
           .from('manager_meta_accounts')
@@ -112,12 +123,11 @@ Deno.serve(async (req: Request) => {
             user_id: user.id,
             account_id: payload.ad_account_id,
             account_name: payload.ad_account_name,
-            access_token: existingSelection.access_token
+            access_token: existingConnection.access_token
           });
 
         if (managerInsertError) {
           console.error('Error saving to manager_meta_accounts:', managerInsertError);
-          // Don't fail the whole request, but log it
         }
       }
     }
@@ -145,10 +155,13 @@ Deno.serve(async (req: Request) => {
       .select()
       .maybeSingle();
 
-    // Fallback if instagram_actor_id column does not exist
+    // Fallback if columns do not exist
     if (selectionError && selectionError.code === '42703') {
-      delete insertSelectionPayload.instagram_actor_id;
-      delete insertSelectionPayload.instagram_actor_name;
+      console.warn('Column missing in meta_account_selections, retrying without optional columns...', selectionError.message);
+
+      // Remove more columns if they likely cause the error
+      const columnsToRemove = ['instagram_actor_id', 'instagram_actor_name', 'page_id', 'page_name', 'access_token'];
+      columnsToRemove.forEach(col => delete insertSelectionPayload[col]);
 
       const retryResult = await supabase
         .from('meta_account_selections')
@@ -159,22 +172,23 @@ Deno.serve(async (req: Request) => {
       selectionData = retryResult.data;
       selectionError = retryResult.error;
     }
+
     if (selectionError) {
       console.error('Error saving selections:', selectionError);
       return new Response(
-        JSON.stringify({ error: 'Failed to save selections' }),
+        JSON.stringify({ error: 'Failed to save selections: ' + selectionError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Fetch access_token from meta_account_selections so we can store it in meta_connections too
+    // Fetch access_token from meta_connections (source of truth)
     let savedAccessToken: string | null = null;
-    const { data: selectionWithToken } = await supabase
-      .from('meta_account_selections')
+    const { data: connectionData } = await supabase
+      .from('meta_connections')
       .select('access_token')
       .eq('user_id', targetUserId)
       .maybeSingle();
-    savedAccessToken = selectionWithToken?.access_token || null;
+    savedAccessToken = connectionData?.access_token || null;
 
     // Also update meta_connections with page, catalog data AND access_token
     const metaConnectionData: Record<string, any> = {
@@ -200,8 +214,10 @@ Deno.serve(async (req: Request) => {
       .upsert(metaConnectionData, { onConflict: 'user_id' });
 
     if (connectionError && connectionError.code === '42703') {
+      console.warn('Column missing in meta_connections, retrying without optional columns...', connectionError.message);
       delete metaConnectionData.instagram_actor_id;
       delete metaConnectionData.instagram_actor_name;
+      // We don't remove page_id/page_name here because 20260102122541 migration already added them
 
       const retryResult = await supabase
         .from('meta_connections')
@@ -212,11 +228,8 @@ Deno.serve(async (req: Request) => {
 
     if (connectionError) {
       console.error('Error saving to meta_connections:', connectionError);
-      // Don't fail the entire operation if meta_connections update fails
-      // Log it but continue
     }
 
-    // Return success — data is saved to meta_account_selections and meta_connections
     return new Response(
       JSON.stringify({ success: true, data: selectionData }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
