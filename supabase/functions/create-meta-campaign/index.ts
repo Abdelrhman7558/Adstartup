@@ -622,6 +622,20 @@ Deno.serve(async (req: Request) => {
                 }
             }
 
+            // Catalog Support: Fetch product_set_id if needed
+            let productSetId = null;
+            if (payload.asset_type === 'catalog' && (payload.catalog_id || meta_connection?.catalog_id)) {
+                const catId = payload.catalog_id || meta_connection?.catalog_id;
+                console.log(`[CreateCampaign] Catalog mode detected. Fetching product sets for catalog: ${catId}`);
+                const psResult = await fetchProductSetId(catId!, accessToken);
+                if (psResult.success) {
+                    productSetId = psResult.productSetId;
+                    console.log(`[CreateCampaign] Using product_set_id: ${productSetId}`);
+                } else {
+                    console.warn(`[CreateCampaign] Warning: Failed to fetch product_set_id: ${psResult.error}`);
+                }
+            }
+
             const adSetParams: Record<string, any> = {
                 name: `${payload.campaign_name} - AdSet`,
                 campaign_id: results.meta_campaign_id,
@@ -633,18 +647,48 @@ Deno.serve(async (req: Request) => {
                 end_time: payload.end_time ? formatMetaDateTime(payload.end_time) : undefined,
                 status: 'PAUSED',
                 targeting: buildTargeting(payload.brief),
-                destination_type: 'WEBSITE',
+                destination_type: payload.asset_type === 'catalog' ? 'SHOPPING_APP' : 'WEBSITE', // Catalog ads often use SHOPPING_APP or inferred
             };
 
-            // If objective is SALES and we have a pixel, add it to AdSet
-            if (payload.objective.toLowerCase() === 'sales' && (payload.pixel_id || meta_connection?.pixel_id)) {
-                adSetParams.promoted_object = {
-                    pixel_id: payload.pixel_id || meta_connection?.pixel_id,
+            // Enhanced Promoted Object (Fix for Pixel Error)
+            if (payload.objective.toLowerCase() === 'sales') {
+                const promotedObj: Record<string, any> = {
                     custom_event_type: 'PURCHASE',
                 };
+
+                // Add Pixel if valid
+                const pxId = payload.pixel_id || meta_connection?.pixel_id;
+                if (pxId && pxId !== 'null' && pxId !== 'undefined' && pxId !== '') {
+                    console.log(`[CreateCampaign] Adding Pixel ID to promoted_object: ${pxId}`);
+                    promotedObj.pixel_id = pxId;
+                } else {
+                    console.warn(`[CreateCampaign] No valid Pixel ID found (using: ${pxId}). Skipping pixel_id in promoted_object.`);
+                }
+
+                // Add Product Set if in Catalog mode
+                if (productSetId) {
+                    console.log(`[CreateCampaign] Adding Product Set ID to promoted_object: ${productSetId}`);
+                    promotedObj.product_set_id = productSetId;
+                    // If we have product_set_id, the destination_type often needs to be SHOPPING_APP or empty for Advantage+
+                    adSetParams.destination_type = undefined;
+                }
+
+                // Only add promoted_object if we have at least Pixel or Product Set
+                if (promotedObj.pixel_id || promotedObj.product_set_id) {
+                    console.log(`[CreateCampaign] Final promoted_object:`, JSON.stringify(promotedObj));
+                    adSetParams.promoted_object = promotedObj;
+                } else {
+                    console.error(`[CreateCampaign] Warning: SALES objective used but no Pixel or Product Set found.`);
+                }
             }
 
-            console.log('[CreateCampaign] Step 2 params:', JSON.stringify(adSetParams, null, 2));
+            // Fallback for destination_type if still undefined and not sales
+            if (!adSetParams.destination_type && !adSetParams.promoted_object) {
+                console.log(`[CreateCampaign] Falling back to destination_type: WEBSITE`);
+                adSetParams.destination_type = 'WEBSITE';
+            }
+
+            console.log('[CreateCampaign] Step 2 Final params:', JSON.stringify(adSetParams, null, 2));
 
             const adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
 
