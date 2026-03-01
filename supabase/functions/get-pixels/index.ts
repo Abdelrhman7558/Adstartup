@@ -82,7 +82,7 @@ Deno.serve(async (req: Request) => {
     const { data: connectionData, error: connectionError } = await supabase
       .from('meta_connections')
       .select('pixel_id, pixel_name')
-      .eq('user_id', user.id)
+      .eq('ad_account_id', adAccountId?.replace('act_', '') || '')
       .maybeSingle();
 
     if (connectionError) {
@@ -96,7 +96,7 @@ Deno.serve(async (req: Request) => {
         id: connectionData.pixel_id,
         name: connectionData.pixel_name || 'Selected Pixel'
       }];
-      console.log(`[get-pixels] Successfully retrieved Pixel from meta_connections table for user: ${user.id}`);
+      console.log(`[get-pixels] Successfully retrieved Pixel from meta_connections for account: ${adAccountId}`);
     }
 
     // fallback check meta_account_selections if not in meta_connections
@@ -113,6 +113,28 @@ Deno.serve(async (req: Request) => {
           name: selectionData.pixel_name || 'Selected Pixel'
         }];
         console.log(`[get-pixels] Successfully retrieved Pixel from meta_account_selections for user: ${user.id}`);
+      }
+    }
+
+    // fallback check 'Accounts' table (Legacy/n8n source)
+    if (pixelsArray.length === 0) {
+      const { data: accountData } = await supabase
+        .from('Accounts')
+        .select('Pixels')
+        .eq('User ID', user.id)
+        .maybeSingle();
+
+      if (accountData?.Pixels) {
+        console.log(`[get-pixels] Found Pixels in Accounts table for user: ${user.id}`);
+        if (Array.isArray(accountData.Pixels)) {
+          pixelsArray = accountData.Pixels;
+        } else if (typeof accountData.Pixels === 'string') {
+          try {
+            pixelsArray = JSON.parse(accountData.Pixels);
+          } catch (e) {
+            console.warn('[get-pixels] Failed to parse Pixels from Accounts table:', e);
+          }
+        }
       }
     }
 

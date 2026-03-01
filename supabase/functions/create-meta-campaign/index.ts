@@ -492,11 +492,11 @@ Deno.serve(async (req: Request) => {
         const { meta_connection } = payload;
 
         // ─── Resolve Account & Token (Crucial for Manager accounts) ───
-        let accessToken = meta_connection?.access_token;
+        let accessToken = null;
         let rawAccountId = payload.account_id || meta_connection?.ad_account_id;
 
-        if (payload.account_id && payload.account_id !== meta_connection?.ad_account_id) {
-            console.log(`[CreateCampaign] Managed account detected: ${payload.account_id}. Fetching specific access token...`);
+        // Priority 1: Manager Specific Account Token
+        if (payload.account_id) {
             const { data: managerAcc } = await supabase
                 .from('manager_meta_accounts')
                 .select('access_token')
@@ -507,9 +507,12 @@ Deno.serve(async (req: Request) => {
             if (managerAcc?.access_token) {
                 console.log(`[CreateCampaign] Using specific access token for managed account.`);
                 accessToken = managerAcc.access_token;
-            } else {
-                console.warn(`[CreateCampaign] Could not find specific token for managed account. Falling back to primary token.`);
             }
+        }
+
+        // Priority 2: Fallback to connection token
+        if (!accessToken) {
+            accessToken = meta_connection?.access_token;
         }
 
         if (!rawAccountId) {
@@ -703,15 +706,28 @@ Deno.serve(async (req: Request) => {
                 };
 
                 // Add Pixel if valid
-                // 1. Check database for the explicitly saved Pixel ID (The source of truth)
-                let pxId = meta_connection?.pixel_id || payload.pixel_id;
+                // 1. Check payload (form selection) first - THIS IS THE MOST IMPORTANT CHOICE
+                let pxId = payload.pixel_id;
 
-                // 2. Clean/Validate the ID
+                // 2. If payload has no pixel, look into meta_connections for this specific account
+                if (!pxId || pxId === 'null' || pxId === 'undefined' || pxId === '') {
+                    console.log(`[CreateCampaign] Pixel missing in payload. Searching meta_connections for account ${adAccountId}...`);
+                    const { data: connRecord } = await supabase
+                        .from('meta_connections')
+                        .select('pixel_id')
+                        .eq('ad_account_id', payload.account_id || adAccountId.replace('act_', ''))
+                        .maybeSingle();
+
+                    if (connRecord?.pixel_id) {
+                        pxId = connRecord.pixel_id;
+                        console.log(`[CreateCampaign] Found pixel_id ${pxId} in meta_connections for this account.`);
+                    }
+                }
+
+                // 3. Fallback to discovery logic if still invalid
                 const isInvalidPx = !pxId || pxId === 'null' || pxId === 'undefined' || pxId === '';
-                const isManagerMismatch = payload.account_id && payload.account_id !== meta_connection?.ad_account_id;
-
-                if (isInvalidPx || isManagerMismatch) {
-                    console.log(`[CreateCampaign] Pixel ID invalid or mismatch suspected. Attempting to fetch pixel for current account ${adAccountId}...`);
+                if (isInvalidPx) {
+                    console.log(`[CreateCampaign] Pixel ID still invalid. Attempting to fetch pixel for account ${adAccountId} from Meta...`);
                     const pxResult = await fetchPixelForAccount(adAccountId, accessToken as string);
                     if (pxResult.success) {
                         pxId = pxResult.pixelId;
