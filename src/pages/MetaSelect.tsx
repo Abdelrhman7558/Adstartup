@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, AlertCircle, Loader2, ChevronRight, ChevronLeft, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { logWebhookCall } from '../lib/webhookUtils';
+import { logWebhookCall, validateUserId } from '../lib/webhookUtils';
 import { supabase } from '../lib/supabase';
 
 interface AdAccount {
@@ -212,12 +212,15 @@ export default function MetaSelect() {
     }
   };
 
-  const fetchPixels = async (): Promise<boolean> => {
+  const fetchPixels = async (adAccountIdOverride?: string): Promise<boolean> => {
     try {
       const validatedUserId = validateUserId(userId || undefined);
+      const targetAdAccountId = adAccountIdOverride || selectedAdAccount;
+
+      console.log('[MetaSelect] Fetching pixels for ad account:', targetAdAccountId);
 
       const { data, error } = await supabase.functions.invoke('get-pixels', {
-        body: { ad_account_id: selectedAdAccount || '' },
+        body: { ad_account_id: targetAdAccountId || '' },
       });
 
       if (error) throw new Error(error.message || 'Failed to fetch pixels');
@@ -233,6 +236,13 @@ export default function MetaSelect() {
       return false;
     }
   };
+
+  // Re-fetch pixels whenever an ad account is selected
+  useEffect(() => {
+    if (userId && selectedAdAccount) {
+      fetchPixels(selectedAdAccount);
+    }
+  }, [selectedAdAccount, userId]);
 
   const fetchCatalogs = async (): Promise<boolean> => {
     try {
@@ -539,8 +549,8 @@ export default function MetaSelect() {
               </div>
             ))}
           </div>
-          <div className="flex gap-2">
-            {currentStep > step ? (
+          <div className="flex gap-2 mt-4">
+            {[1, 2, 3, 4, 5].map((step) => (
               <div
                 key={step}
                 className="flex-1"

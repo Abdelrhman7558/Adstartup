@@ -47,6 +47,8 @@ interface CampaignPayload {
     }>;
     catalog_id: string | null;
     catalog_name: string | null;
+    pixel_id: string | null;
+    pixel_name: string | null;
     page_id: string | null;
     page_name: string | null;
     selected_instagram_id?: string;
@@ -605,317 +607,51 @@ Deno.serve(async (req: Request) => {
             createdResources.push({ type: 'campaign', id: results.meta_campaign_id });
             console.log('[CreateCampaign] ✅ Campaign created:', results.meta_campaign_id);
 
-            // ─── Step 2: Create Ad Creative (matching n8n) ──────────────
+            // ─── Step 2: Send Webhook to n8n (Delegated processing) ──────
 
-            const creativeParams: Record<string, any> = {
-                name: `${payload.campaign_name} - Creative`,
+            console.log('[CreateCampaign] Step 2 - Sending data to n8n webhook...');
+
+            const n8nWebhookUrl = 'https://n8n.srv1181726.hstgr.cloud/webhook-test/Creative&Ad';
+            const webhookPayload = {
+                campaign_id: payload.campaign_id, // Internal UUID
+                meta_campaign_id: results.meta_campaign_id, // Meta ID from Step 1
+                ad_account_id: adAccountId,
+                pixel_id: payload.pixel_id || meta_connection?.pixel_id,
+                catalog_id: payload.catalog_id || meta_connection?.catalog_id,
+                page_id: pageId,
+                access_token: accessToken,
+                original_request_body: payload
             };
 
-            const websiteUrl = payload.brief?.website_url || payload.brief?.['Website URL or social page'] || 'https://example.com';
+            console.log('[CreateCampaign] Webhook destination:', n8nWebhookUrl);
 
-            if (payload.asset_type === 'catalog' && payload.catalog_id) {
-                // ─── CATALOG CREATIVE (matching n8n Creatives1/Creatives3 nodes) ───
-                console.log('[CreateCampaign] Step 2 - Catalog creative, fetching product_set_id...');
+            const webhookResponse = await fetch(n8nWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(webhookPayload)
+            });
 
-                // Fetch real product_set_id from catalog (critical fix!)
-                const psResult = await fetchProductSetId(payload.catalog_id, accessToken);
-                if (!psResult.success) {
-                    throw new Error(`[Step 2 - Creative] ${psResult.error}`);
-                }
+            const webhookResult = await webhookResponse.text();
+            console.log('[CreateCampaign] n8n Response:', webhookResult);
 
-                // Try to get explicit Instagram Actor ID from payload, or fetch it as fallback
-                let instagramActorId: string | null = payload.selected_instagram_id || payload.meta_connection?.instagram_actor_id || null;
-                if (!instagramActorId) {
-                    console.log('[CreateCampaign] No explicit Instagram Actor ID in payload, fetching implicitly...');
-                    const igResult = await fetchInstagramActorId(pageId, accessToken);
-                    instagramActorId = igResult.success ? (igResult.instagramActorId || null) : null;
-                } else {
-                    console.log(`[CreateCampaign] Using explicit Instagram Actor ID: ${instagramActorId}`);
-                }
-
-                creativeParams.product_set_id = psResult.productSetId;
-                creativeParams.object_story_spec = {
-                    page_id: pageId,
-                    instagram_actor_id: instagramActorId,
-                    template_data: {
-                        call_to_action: { type: 'SHOP_NOW' },
-                        link: websiteUrl,
-                        message: payload.description || 'Check out our products!',
-                        description: payload.offer || '',
-                    },
-                };
-
-                console.log(`[CreateCampaign] Using product_set_id: ${psResult.productSetId} (fetched from catalog ${payload.catalog_id})`);
-
-            } else if (payload.asset_type === 'upload' && payload.assets && payload.assets.length > 0) {
-                // ─── UPLOAD CREATIVE (matching n8n adimage → Creatives nodes) ───
-                const validAssets = payload.assets.filter((a) => a.file_url && a.file_url.trim() !== '');
-                if (validAssets.length === 0) {
-                    throw new Error('[Step 2 - Creative] All uploaded assets have empty URLs. Please re-upload your files.');
-                }
-
-                const primaryAsset = validAssets[0];
-                const isVideo = primaryAsset.file_type?.startsWith('video');
-
-                // Try to get explicit Instagram Actor ID from payload, or fetch it as fallback
-                let instagramActorId: string | null = payload.selected_instagram_id || payload.meta_connection?.instagram_actor_id || null;
-                if (!instagramActorId) {
-                    console.log('[CreateCampaign] No explicit Instagram Actor ID in payload, fetching implicitly...');
-                    const igResult = await fetchInstagramActorId(pageId, accessToken);
-                    instagramActorId = igResult.success ? (igResult.instagramActorId || null) : null;
-                } else {
-                    console.log(`[CreateCampaign] Using explicit Instagram Actor ID: ${instagramActorId}`);
-                }
-
-                if (isVideo) {
-                    creativeParams.object_story_spec = {
-                        page_id: pageId,
-                        instagram_actor_id: instagramActorId,
-                        video_data: {
-                            video_url: primaryAsset.file_url,
-                            title: payload.campaign_name,
-                            message: payload.description || payload.campaign_name,
-                            call_to_action: {
-                                type: 'SHOP_NOW',
-                                value: { link: websiteUrl },
-                            },
-                        },
-                    };
-                } else {
-                    // Upload image to Meta to get image_hash (matching n8n adimage node)
-                    console.log('[CreateCampaign] Step 2 - Uploading image to Meta for image_hash...');
-                    const uploadResult = await uploadImageToMeta(adAccountId, accessToken, primaryAsset.file_url);
-
-                    if (uploadResult.success && uploadResult.imageHash) {
-                        // Use image_hash (the reliable way, matching n8n)
-                        creativeParams.object_story_spec = {
-                            page_id: pageId,
-                            instagram_actor_id: instagramActorId,
-                            link_data: {
-                                image_hash: uploadResult.imageHash,
-                                link: websiteUrl,
-                                message: payload.description || payload.campaign_name,
-                                name: payload.campaign_name,
-                                call_to_action: { type: 'SHOP_NOW' },
-                            },
-                        };
-                        console.log(`[CreateCampaign] Using image_hash: ${uploadResult.imageHash}`);
-                    } else {
-                        // Fallback: try image_url directly (may fail if URL isn't public)
-                        console.warn(`[CreateCampaign] Image upload failed (${uploadResult.error}), falling back to image_url`);
-                        creativeParams.object_story_spec = {
-                            page_id: pageId,
-                            instagram_actor_id: instagramActorId,
-                            link_data: {
-                                image_url: primaryAsset.file_url,
-                                link: websiteUrl,
-                                message: payload.description || payload.campaign_name,
-                                name: payload.campaign_name,
-                                call_to_action: { type: 'SHOP_NOW' },
-                            },
-                        };
-                    }
-                }
-            }
-
-            console.log('[CreateCampaign] Step 2 - Creative params:', JSON.stringify(creativeParams, null, 2));
-
-            // Add access_token to creative params body (matching n8n)
-            const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
-
-            await supabase.from('meta_account_selections').upsert({
-                user_id: user.id,
-                webhook_response: {
-                    debug_step: 'step2_creative',
-                    creative_params_keys: Object.keys(creativeParams),
-                    page_id: pageId,
-                    asset_type: payload.asset_type,
-                    catalog_id: payload.catalog_id,
-                    has_product_set_id: !!creativeParams.product_set_id,
-                    result: creativeResult,
-                    timestamp: new Date().toISOString()
-                },
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' });
-
-            if (!creativeResult.success) {
-                throw new Error(`[Step 2 - Creative] ${creativeResult.error}`);
-            }
-
-            results.meta_creative_id = creativeResult.data.id;
-            createdResources.push({ type: 'creative', id: results.meta_creative_id });
-            console.log('[CreateCampaign] ✅ Creative created:', results.meta_creative_id);
-
-            // ─── Step 3: Create Ad Set (matching n8n Adsets node) ────────
-
-            const targeting = buildTargeting(payload.brief || {});
-            const adSetParams: Record<string, any> = {
-                campaign_id: results.meta_campaign_id,
-                name: `${payload.campaign_name} - Ad Set`,
-                billing_event: 'IMPRESSIONS',
-                bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
-                daily_budget: budgetToCents(payload.daily_budget),
-                status: 'PAUSED',
-                start_time: formatMetaDateTime(payload.start_time, true),
-                targeting: targeting,
-            };
-
-            if (payload.end_time) {
-                adSetParams.end_time = formatMetaDateTime(payload.end_time);
-            }
-
-            // ─── Promoted Object (CRITICAL for OUTCOME_SALES) ─────────
-            // Meta requires promoted_object for OUTCOME_SALES campaigns.
-            // For CATALOG campaigns: use product_catalog_id + product_set_id
-            // For UPLOAD campaigns: use pixel_id + custom_event_type
-            // If neither is available: fall back to LINK_CLICKS optimization
-            const isSalesObjective = metaObjective === 'OUTCOME_SALES';
-            const isTrafficObjective = metaObjective === 'OUTCOME_TRAFFIC';
-
-            if (payload.asset_type === 'catalog' && payload.catalog_id) {
-                // CATALOG: promoted_object MUST have product_catalog_id AND product_set_id
-                const promotedObject: Record<string, any> = {
-                    product_catalog_id: payload.catalog_id,
-                };
-                if (creativeParams.product_set_id) {
-                    promotedObject.product_set_id = creativeParams.product_set_id;
-                }
-                // When optimizing for OFFSITE_CONVERSIONS, pixel_id and custom_event_type are usually required
-                if (meta_connection.pixel_id) {
-                    promotedObject.pixel_id = meta_connection.pixel_id;
-                    promotedObject.custom_event_type = 'PURCHASE';
-                }
-                adSetParams.promoted_object = promotedObject;
-                adSetParams.optimization_goal = 'OFFSITE_CONVERSIONS';
-                console.log('[CreateCampaign] Using CATALOG promoted_object:', JSON.stringify(adSetParams.promoted_object));
-            } else if (meta_connection.pixel_id) {
-                // PIXEL: promoted_object with pixel_id
-                adSetParams.promoted_object = {
-                    pixel_id: meta_connection.pixel_id,
-                    custom_event_type: 'PURCHASE',
-                };
-                adSetParams.optimization_goal = 'OFFSITE_CONVERSIONS';
-                console.log('[CreateCampaign] Using PIXEL promoted_object:', JSON.stringify(adSetParams.promoted_object));
-            } else if (isSalesObjective || isTrafficObjective) {
-                // No catalog, no pixel → can't do OFFSITE_CONVERSIONS
-                // Use LINK_CLICKS which doesn't require promoted_object
-                adSetParams.optimization_goal = 'LINK_CLICKS';
-                // For sales without pixel/catalog, add page_id as promoted_object
-                if (pageId) {
-                    adSetParams.promoted_object = { page_id: pageId };
-                    console.log('[CreateCampaign] Using PAGE promoted_object for sales/traffic:', pageId);
-                } else {
-                    console.log('[CreateCampaign] No promoted_object available, using LINK_CLICKS');
-                }
-            } else {
-                // Other objectives (AWARENESS, ENGAGEMENT, etc.)
-                adSetParams.optimization_goal = mapOptimizationGoal(payload.goal, payload.objective);
-                if (meta_connection.pixel_id && isSalesObjective) {
-                    adSetParams.promoted_object = {
-                        pixel_id: meta_connection.pixel_id,
-                        custom_event_type: 'PURCHASE',
-                    };
-                }
-                console.log('[CreateCampaign] Using optimization_goal:', adSetParams.optimization_goal);
-            }
-
-            // Always strip OFFSITE_CONVERSIONS if lacking pixel to prevent error
-            if (adSetParams.optimization_goal === 'OFFSITE_CONVERSIONS' && !meta_connection.pixel_id) {
-                adSetParams.optimization_goal = 'LINK_CLICKS';
-            }
-
-            console.log('[CreateCampaign] Step 3 - Ad set params:', JSON.stringify(adSetParams, null, 2));
-
-            let adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
-
-            // If first attempt fails, retry with different strategies
-            if (!adSetResult.success) {
-                const firstError = adSetResult.error || '';
-                console.warn('[CreateCampaign] Step 3 first attempt failed:', firstError);
-
-                // Retry strategy 1: Keep promoted_object but try LINK_CLICKS optimization
-                if (adSetParams.optimization_goal !== 'LINK_CLICKS') {
-                    console.log('[CreateCampaign] Step 3 retry 1: switching to LINK_CLICKS optimization...');
-                    adSetParams.optimization_goal = 'LINK_CLICKS';
-                    adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
-                }
-
-                // Retry strategy 2: If still failing, try without promoted_object and with LANDING_PAGE_VIEWS
-                if (!adSetResult.success) {
-                    console.log('[CreateCampaign] Step 3 retry 2: removing promoted_object, using LANDING_PAGE_VIEWS...');
-                    delete adSetParams.promoted_object;
-                    adSetParams.optimization_goal = 'LANDING_PAGE_VIEWS';
-                    adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
-                }
-
-                // Retry strategy 3: Last resort - IMPRESSIONS
-                if (!adSetResult.success) {
-                    console.log('[CreateCampaign] Step 3 retry 3: using IMPRESSIONS optimization...');
-                    adSetParams.optimization_goal = 'IMPRESSIONS';
-                    adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
-                }
-
-                // Keep the first error so the user sees the real reason it failed
-                if (!adSetResult.success) {
-                    adSetResult.error = firstError;
-                }
-            }
-
-            if (!adSetResult.success) {
-                await supabase.from('meta_account_selections').upsert({
-                    user_id: user.id,
-                    webhook_response: {
-                        debug_step: 'step3_adset',
-                        adset_params: adSetParams,
-                        result: adSetResult,
-                        timestamp: new Date().toISOString()
-                    },
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id' });
-                throw new Error(`[Step 3 - Ad Set] ${adSetResult.error}`);
-            }
-
-            const adsetId = adSetResult.data.id;
-            results.meta_adset_ids.push(adsetId);
-            createdResources.push({ type: 'adset', id: adsetId });
-            console.log('[CreateCampaign] ✅ Ad Set created:', adsetId);
-
-            // ─── Step 4: Create Ad (matching n8n Ad node) ───────────────
-
-            const adParams: Record<string, any> = {
-                name: `${payload.campaign_name} - Ad`,
-                adset_id: adsetId,
-                creative: { creative_id: results.meta_creative_id },
-                status: 'PAUSED',
-            };
-
-            console.log('[CreateCampaign] Step 4 - Ad params:', JSON.stringify(adParams, null, 2));
-
-            const adResult = await metaApiPost(`/${adAccountId}/ads`, accessToken, adParams);
-
-            if (!adResult.success) {
-                throw new Error(`[Step 4 - Ad] ${adResult.error}`);
-            }
-
-            const adId = adResult.data.id;
-            results.meta_ad_ids.push(adId);
-            createdResources.push({ type: 'ad', id: adId });
-            console.log('[CreateCampaign] ✅ Ad created:', adId);
-
-            // ─── Step 5: Update local DB with Meta IDs ──────────────────
+            // ─── Step 3: Update local DB with Meta Campaign ID ──────────
 
             const { error: updateError } = await supabase
                 .from('campaigns')
                 .update({
                     meta_campaign_id: results.meta_campaign_id,
-                    meta_adset_id: results.meta_adset_ids[0],
-                    meta_creative_id: results.meta_creative_id,
-                    meta_ad_id: results.meta_ad_ids[0],
-                    status: 'paused',
+                    status: 'processing', // Mark as processing since n8n is doing the rest
                     updated_at: new Date().toISOString(),
                 })
                 .eq('id', payload.campaign_id)
                 .eq('user_id', payload.user_id);
+
+            if (updateError) {
+                console.error('[CreateCampaign] DB Update Error:', updateError);
+            }
+
+            results.success = true;
+            results.message = 'Campaign created and sent to n8n for additional processing.';
 
             if (updateError) {
                 console.warn('[CreateCampaign] Failed to update local DB (campaign still created on Meta):', updateError);
