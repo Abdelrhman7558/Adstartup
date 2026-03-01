@@ -607,19 +607,109 @@ Deno.serve(async (req: Request) => {
             createdResources.push({ type: 'campaign', id: results.meta_campaign_id });
             console.log('[CreateCampaign] ✅ Campaign created:', results.meta_campaign_id);
 
-            // ─── Step 2: Send Webhook to n8n (Delegated processing) ──────
+            // ─── Step 2: Create AdSet ─────────────────────────────────
 
-            console.log('[CreateCampaign] Step 2 - Sending data to n8n webhook...');
+            console.log('[CreateCampaign] Step 2 - Creating Meta AdSet...');
+
+            // Fetch Instagram Actor ID if not provided
+            let instagramActorId = payload.selected_instagram_id || meta_connection?.instagram_actor_id;
+            if (!instagramActorId && pageId) {
+                const igResult = await fetchInstagramActorId(pageId, accessToken);
+                if (igResult.success) {
+                    instagramActorId = igResult.instagramActorId;
+                } else {
+                    console.warn('[CreateCampaign] Could not find Instagram Actor ID:', igResult.error);
+                }
+            }
+
+            const adSetParams: Record<string, any> = {
+                name: `${payload.campaign_name} - AdSet`,
+                campaign_id: results.meta_campaign_id,
+                billing_event: 'IMPRESSIONS',
+                optimization_goal: mapOptimizationGoal(payload.goal, payload.objective),
+                bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
+                daily_budget: budgetToCents(payload.daily_budget),
+                start_time: formatMetaDateTime(payload.start_time, true),
+                end_time: payload.end_time ? formatMetaDateTime(payload.end_time) : undefined,
+                status: 'PAUSED',
+                targeting: buildTargeting(payload.brief),
+                destination_type: 'WEBSITE',
+            };
+
+            // If objective is SALES and we have a pixel, add it to AdSet
+            if (payload.objective.toLowerCase() === 'sales' && (payload.pixel_id || meta_connection?.pixel_id)) {
+                adSetParams.promoted_object = {
+                    pixel_id: payload.pixel_id || meta_connection?.pixel_id,
+                    custom_event_type: 'PURCHASE',
+                };
+            }
+
+            console.log('[CreateCampaign] Step 2 params:', JSON.stringify(adSetParams, null, 2));
+
+            const adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+
+            await supabase.from('meta_account_selections').upsert({
+                user_id: user.id,
+                webhook_response: {
+                    debug_step: 'step2_adset',
+                    params: adSetParams,
+                    result: adSetResult,
+                    timestamp: new Date().toISOString()
+                },
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+
+            if (!adSetResult.success) {
+                throw new Error(`[Step 2 - AdSet] ${adSetResult.error}`);
+            }
+
+            results.meta_adset_id = adSetResult.data.id;
+            results.meta_adset_ids = [results.meta_adset_id];
+            createdResources.push({ type: 'adset', id: results.meta_adset_id });
+            console.log('[CreateCampaign] ✅ AdSet created:', results.meta_adset_id);
+
+            // ─── Step 3: Send Webhook to n8n (Delegated Creative & Ad) ──────
+
+            console.log('[CreateCampaign] Step 3 - Sending data to n8n webhook...');
 
             const n8nWebhookUrl = 'https://n8n.srv1181726.hstgr.cloud/webhook-test/Creative&Ad';
+
+            // Construct Creative Payload (Multiple Assets support)
+            const creativePayload = {
+                name: `${payload.campaign_name} - Creative`,
+                object_story_spec: {
+                    page_id: pageId,
+                    instagram_actor_id: instagramActorId, // Crucial for fixing "Invalid parameter"
+                    link_data: {
+                        message: payload.description,
+                        link: 'https://atlantis-ads.com', // Placeholder or from brief
+                        caption: payload.campaign_name,
+                        // For simplicity, using first asset if multiple
+                        picture: payload.assets.length > 0 ? payload.assets[0].file_url : undefined,
+                    }
+                }
+            };
+
+            // Construct Ad Payload
+            const adPayload = {
+                name: `${payload.campaign_name} - Ad`,
+                adset_id: results.meta_adset_id,
+                creative: { creative_id: 'WILL_BE_REPLACED_BY_N8N' },
+                status: 'PAUSED',
+            };
+
             const webhookPayload = {
                 campaign_id: payload.campaign_id, // Internal UUID
                 meta_campaign_id: results.meta_campaign_id, // Meta ID from Step 1
+                meta_adset_id: results.meta_adset_id, // Meta ID from Step 2
                 ad_account_id: adAccountId,
                 pixel_id: payload.pixel_id || meta_connection?.pixel_id,
                 catalog_id: payload.catalog_id || meta_connection?.catalog_id,
                 page_id: pageId,
+                instagram_actor_id: instagramActorId,
                 access_token: accessToken,
+                creative_spec: creativePayload,
+                ad_spec: adPayload,
                 original_request_body: payload
             };
 
@@ -634,7 +724,7 @@ Deno.serve(async (req: Request) => {
             const webhookResult = await webhookResponse.text();
             console.log('[CreateCampaign] n8n Response:', webhookResult);
 
-            // ─── Step 3: Update local DB with Meta Campaign ID ──────────
+            // ─── Step 4: Update local DB with Meta IDs ──────────
 
             const { error: updateError } = await supabase
                 .from('campaigns')
@@ -651,11 +741,7 @@ Deno.serve(async (req: Request) => {
             }
 
             results.success = true;
-            results.message = 'Campaign created and sent to n8n for additional processing.';
-
-            if (updateError) {
-                console.warn('[CreateCampaign] Failed to update local DB (campaign still created on Meta):', updateError);
-            }
+            results.message = 'Campaign and AdSet created. Sent to n8n for Creative and Ad processing.';
 
             // Save final success debug data
             await supabase.from('meta_account_selections').upsert({
@@ -663,22 +749,19 @@ Deno.serve(async (req: Request) => {
                 webhook_response: {
                     debug_step: 'SUCCESS',
                     results: results,
+                    webhook_sent: true,
                     timestamp: new Date().toISOString()
                 },
                 updated_at: new Date().toISOString()
             }, { onConflict: 'user_id' });
 
-            console.log('[CreateCampaign] ✅ Full campaign created successfully!', results);
+            console.log('[CreateCampaign] ✅ Phase 1 created successfully!', results);
 
             return new Response(
                 JSON.stringify({
                     success: true,
-                    message: 'Campaign created successfully! Status: PAUSED',
-                    data: {
-                        ...results,
-                        meta_adset_id: results.meta_adset_ids[0],
-                        meta_ad_id: results.meta_ad_ids[0],
-                    },
+                    message: 'Campaign and AdSet created successfully!',
+                    data: results,
                 }),
                 { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
