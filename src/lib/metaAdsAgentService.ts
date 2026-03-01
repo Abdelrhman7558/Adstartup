@@ -14,6 +14,7 @@ import { supabase } from './supabase';
 export interface MetaConnectionData {
     ad_account_id: string | null;
     pixel_id: string | null;
+    pixel_name: string | null;
     catalog_id: string | null;
     catalog_name: string | null;
     page_id: string | null;
@@ -104,6 +105,8 @@ export interface CampaignFormData {
     selected_catalog_name?: string;
     selected_page_id?: string;
     selected_page_name?: string;
+    selected_pixel_id?: string;
+    selected_pixel_name?: string;
     selected_instagram_id?: string;
     account_id?: string;
     account_name?: string;
@@ -130,6 +133,8 @@ export interface MetaAdsAgentPayload {
     page_id: string | null;
     page_name: string | null;
     instagram_actor_id: string | null;
+    pixel_id: string | null;
+    pixel_name: string | null;
     account_id: string | null;
     account_name: string | null;
     agent_mode: 'TEST_MODE' | 'OPTIMIZE_MODE' | 'SCALE_MODE' | 'HOLD_MODE';
@@ -147,7 +152,7 @@ export async function fetchMetaConnection(userId: string): Promise<MetaConnectio
 
         const { data, error } = await supabase
             .from('meta_connections')
-            .select('ad_account_id, pixel_id, catalog_id, catalog_name, page_id, page_name, instagram_actor_id, access_token')
+            .select('ad_account_id, pixel_id, pixel_name, catalog_id, catalog_name, page_id, page_name, instagram_actor_id, access_token')
             .eq('user_id', userId)
             .eq('is_connected', true)
             .maybeSingle();
@@ -173,6 +178,7 @@ export async function fetchMetaConnection(userId: string): Promise<MetaConnectio
         return {
             ad_account_id: data.ad_account_id || null,
             pixel_id: data.pixel_id || null,
+            pixel_name: data.pixel_name || null,
             catalog_id: data.catalog_id || null,
             catalog_name: data.catalog_name || null,
             page_id: data.page_id || null,
@@ -374,6 +380,10 @@ export async function buildAgentPayload(
             page_id: campaignForm.selected_page_id || metaConnection.page_id,
             page_name: campaignForm.selected_page_name || metaConnection.page_name,
             instagram_actor_id: campaignForm.selected_instagram_id || metaConnection.instagram_actor_id,
+
+            // Pixel info
+            pixel_id: campaignForm.selected_pixel_id || metaConnection.pixel_id,
+            pixel_name: campaignForm.selected_pixel_name || metaConnection.pixel_name,
 
             // Manager account info
             account_id: campaignForm.account_id || null,

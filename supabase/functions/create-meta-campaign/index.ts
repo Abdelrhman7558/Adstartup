@@ -299,6 +299,32 @@ async function fetchInstagramActorId(
     return { success: false, error: 'No Instagram account connected to this page.' };
 }
 
+// ─── Helper: Fetch first valid Pixel for Ad Account ───────────
+
+async function fetchPixelForAccount(
+    adAccountId: string,
+    accessToken: string
+): Promise<{ success: boolean; pixelId?: string; error?: string }> {
+    console.log(`[MetaAPI] Fetching pixels for account: ${adAccountId}`);
+    const result = await metaApiGet(
+        `/${adAccountId}/adspixels`,
+        accessToken,
+        { fields: 'id,name' }
+    );
+
+    if (!result.success) {
+        return { success: false, error: `Failed to fetch pixels: ${result.error}` };
+    }
+
+    const pixels = result.data?.data;
+    if (!pixels || pixels.length === 0) {
+        return { success: false, error: 'No pixels found for this ad account.' };
+    }
+
+    console.log(`[MetaAPI] Found ${pixels.length} pixels. Using first: ${pixels[0].id} (${pixels[0].name})`);
+    return { success: true, pixelId: pixels[0].id };
+}
+
 // ─── Map objective to Meta API values ───────────────────────────
 
 function mapObjective(objective: string): string {
@@ -464,23 +490,43 @@ Deno.serve(async (req: Request) => {
 
         // Validate required fields
         const { meta_connection } = payload;
-        if (!meta_connection?.ad_account_id) {
+
+        // ─── Resolve Account & Token (Crucial for Manager accounts) ───
+        let accessToken = meta_connection?.access_token;
+        let rawAccountId = payload.account_id || meta_connection?.ad_account_id;
+
+        if (payload.account_id && payload.account_id !== meta_connection?.ad_account_id) {
+            console.log(`[CreateCampaign] Managed account detected: ${payload.account_id}. Fetching specific access token...`);
+            const { data: managerAcc } = await supabase
+                .from('manager_meta_accounts')
+                .select('access_token')
+                .eq('user_id', user.id)
+                .eq('account_id', payload.account_id)
+                .maybeSingle();
+
+            if (managerAcc?.access_token) {
+                console.log(`[CreateCampaign] Using specific access token for managed account.`);
+                accessToken = managerAcc.access_token;
+            } else {
+                console.warn(`[CreateCampaign] Could not find specific token for managed account. Falling back to primary token.`);
+            }
+        }
+
+        if (!rawAccountId) {
             return new Response(
                 JSON.stringify({ error: 'Missing ad_account_id. Please connect your Meta account first.' }),
                 { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
-        if (!meta_connection?.access_token) {
+
+        if (!accessToken) {
             return new Response(
                 JSON.stringify({ error: 'Missing access token. Please reconnect your Meta account.' }),
                 { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
-        const accessToken = meta_connection.access_token;
-        const adAccountId = meta_connection.ad_account_id.startsWith('act_')
-            ? meta_connection.ad_account_id
-            : `act_${meta_connection.ad_account_id}`;
+        const adAccountId = rawAccountId.startsWith('act_') ? rawAccountId : `act_${rawAccountId}`;
 
         const pageId = payload.page_id || meta_connection.page_id;
 
@@ -657,7 +703,20 @@ Deno.serve(async (req: Request) => {
                 };
 
                 // Add Pixel if valid
-                const pxId = payload.pixel_id || meta_connection?.pixel_id;
+                let pxId = payload.pixel_id || meta_connection?.pixel_id;
+
+                // If the provided pixel is obviously wrong (string "null" or missing) or if it's potentially from another account (Manager scenario)
+                const isInvalidPx = !pxId || pxId === 'null' || pxId === 'undefined' || pxId === '';
+                const isManagerMismatch = payload.account_id && payload.account_id !== meta_connection?.ad_account_id;
+
+                if (isInvalidPx || isManagerMismatch) {
+                    console.log(`[CreateCampaign] Pixel ID invalid or mismatch suspected. Attempting to fetch pixel for current account ${adAccountId}...`);
+                    const pxResult = await fetchPixelForAccount(adAccountId, accessToken as string);
+                    if (pxResult.success) {
+                        pxId = pxResult.pixelId;
+                    }
+                }
+
                 if (pxId && pxId !== 'null' && pxId !== 'undefined' && pxId !== '') {
                     console.log(`[CreateCampaign] Adding Pixel ID to promoted_object: ${pxId}`);
                     promotedObj.pixel_id = pxId;
@@ -750,7 +809,7 @@ Deno.serve(async (req: Request) => {
                 pixel_id: payload.pixel_id || meta_connection?.pixel_id,
                 catalog_id: payload.catalog_id || meta_connection?.catalog_id,
                 page_id: pageId,
-                instagram_actor_id: instagramActorId,
+                instagram_actor_id: instagramActorId || null,
                 access_token: accessToken,
                 creative_spec: creativePayload,
                 ad_spec: adPayload,
