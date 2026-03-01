@@ -780,7 +780,9 @@ Deno.serve(async (req: Request) => {
             }, { onConflict: 'user_id' });
 
             if (!adSetResult.success) {
-                throw new Error(`[Step 2 - AdSet] ${adSetResult.error}`);
+                const pxAttempted = adSetParams.promoted_object?.pixel_id || 'NONE';
+                const pxPayload = payload.pixel_id || 'NONE';
+                throw new Error(`[Step 2 - AdSet] ${adSetResult.error} (Attempted Pixel: ${pxAttempted}, Payload Pixel: ${pxPayload})`);
             }
 
             results.meta_adset_id = adSetResult.data.id;
