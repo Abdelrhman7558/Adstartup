@@ -703,9 +703,10 @@ Deno.serve(async (req: Request) => {
                 };
 
                 // Add Pixel if valid
-                let pxId = payload.pixel_id || meta_connection?.pixel_id;
+                // 1. Check database for the explicitly saved Pixel ID (The source of truth)
+                let pxId = meta_connection?.pixel_id || payload.pixel_id;
 
-                // If the provided pixel is obviously wrong (string "null" or missing) or if it's potentially from another account (Manager scenario)
+                // 2. Clean/Validate the ID
                 const isInvalidPx = !pxId || pxId === 'null' || pxId === 'undefined' || pxId === '';
                 const isManagerMismatch = payload.account_id && payload.account_id !== meta_connection?.ad_account_id;
 

@@ -79,6 +79,10 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
   const [selectedInstagramName, setSelectedInstagramName] = useState('');
   const [instagramAccounts, setInstagramAccounts] = useState<MetaInstagram[]>([]);
 
+  const [pixels, setPixels] = useState<{ id: string; name: string }[]>([]);
+  const [selectedPixelId, setSelectedPixelId] = useState('');
+  const [selectedPixelName, setSelectedPixelName] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
@@ -91,6 +95,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
         loadManagerAccounts();
       }
       resetForm();
+      loadPixels();
     }
   }, [isOpen, user]);
 
@@ -115,6 +120,9 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
     setError('');
     setSelectedAccountId('');
     setSelectedAccountName('');
+    setPixels([]);
+    setSelectedPixelId('');
+    setSelectedPixelName('');
   };
 
   const loadManagerAccounts = async () => {
@@ -172,6 +180,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
     }
   };
 
+
   const loadInstagramAccounts = async (pageId: string) => {
     if (!user || !pageId) return;
     setLoading(true);
@@ -199,6 +208,35 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
       setInstagramAccounts([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPixels = async (accountId?: string) => {
+    if (!user) return;
+    setLoading(true);
+    setStatusMessage('Loading tracking pixels...');
+    try {
+      const { data, error } = await supabase.functions.invoke('get-pixels', {
+        body: { ad_account_id: accountId }
+      });
+
+      if (error) throw error;
+      const fetchedPixels = data?.data || [];
+      console.log('Pixels fetched:', fetchedPixels);
+      setPixels(fetchedPixels);
+
+      if (fetchedPixels.length > 0) {
+        // Auto-select first pixel if none selected
+        if (!selectedPixelId) {
+          setSelectedPixelId(fetchedPixels[0].id);
+          setSelectedPixelName(fetchedPixels[0].name);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load pixels:', err);
+    } finally {
+      setLoading(false);
+      setStatusMessage('');
     }
   };
 
@@ -479,9 +517,11 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
         selected_catalog_name: selectedCatalogName || undefined,
         selected_page_id: selectedPageId || undefined,
         selected_page_name: selectedPageName || undefined,
-        selected_instagram_id: selectedInstagramId || undefined, // Added this line
+        selected_instagram_id: selectedInstagramId || undefined,
         account_id: isManagerPlanUser(user.email) && selectedAccountId ? selectedAccountId : undefined,
         account_name: isManagerPlanUser(user.email) && selectedAccountName ? selectedAccountName : undefined,
+        selected_pixel_id: selectedPixelId || undefined,
+        selected_pixel_name: selectedPixelName || undefined,
       };
 
       // Build the full agent payload (pulls meta_connections, client_briefs, assets from DB)
@@ -667,6 +707,9 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
                         const account = accounts.find(a => a.account_id === e.target.value);
                         setSelectedAccountId(e.target.value);
                         setSelectedAccountName(account?.account_name || '');
+                        if (e.target.value) {
+                          loadPixels(e.target.value);
+                        }
                       }}
                       className={`w-full px-4 py-3 rounded-xl border ${theme === 'dark'
                         ? 'bg-gray-700 border-gray-600 text-white'
@@ -686,6 +729,37 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
                     <p className={`text-sm ${theme === 'dark' ? 'text-yellow-200' : 'text-yellow-800'}`}>
                       ⚠️ No connected ad accounts found. Please connect accounts from the dashboard first.
                     </p>
+                  </div>
+                )}
+
+                {selectedAccountId && (
+                  <div className="mt-6">
+                    <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      Tracking Pixel *
+                    </label>
+                    {pixels.length > 0 ? (
+                      <select
+                        value={selectedPixelId}
+                        onChange={(e) => {
+                          const px = pixels.find(p => p.id === e.target.value);
+                          setSelectedPixelId(e.target.value);
+                          setSelectedPixelName(px?.name || '');
+                        }}
+                        className={`w-full px-4 py-3 rounded-xl border ${theme === 'dark'
+                          ? 'bg-gray-700 border-gray-600 text-white'
+                          : 'bg-white border-gray-300 text-gray-900'
+                          } focus:ring-2 focus:ring-blue-500 focus:outline-none`}
+                      >
+                        <option value="">Select Pixel</option>
+                        {pixels.map((px) => (
+                          <option key={px.id} value={px.id}>
+                            {px.name} ({px.id})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="text-sm text-yellow-500">Loading pixels or no pixels found for this account...</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -1190,7 +1264,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
             </button>
           )}
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }

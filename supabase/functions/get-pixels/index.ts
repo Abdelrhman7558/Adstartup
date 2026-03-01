@@ -78,40 +78,41 @@ Deno.serve(async (req: Request) => {
       adAccountId = metaConnection?.ad_account_id || null;
     }
 
-    // Fetch pixels from the 'Accounts' table based on the n8n workflow logic
-    const { data: accountData, error: accountError } = await supabase
-      .from('Accounts')
-      .select('Pixels')
-      .eq('User ID', user.id)
-      .limit(1)
+    // Fetch pixels from the 'meta_connections' table where the user's choices are stored
+    const { data: connectionData, error: connectionError } = await supabase
+      .from('meta_connections')
+      .select('pixel_id, pixel_name')
+      .eq('user_id', user.id)
       .maybeSingle();
 
-    if (accountError) {
-      console.error('[get-pixels] Error querying Accounts table:', accountError);
+    if (connectionError) {
+      console.error('[get-pixels] Error querying meta_connections table:', connectionError);
     }
 
     let pixelsArray: any[] = [];
 
-    if (accountData && accountData.Pixels) {
-      if (Array.isArray(accountData.Pixels)) {
-        pixelsArray = accountData.Pixels;
-        console.log(`[get-pixels] Successfully retrieved Pixels array from Accounts table for user: ${user.id}`);
-      } else if (typeof accountData.Pixels === 'string') {
-        try {
-          pixelsArray = JSON.parse(accountData.Pixels);
-          console.log(`[get-pixels] Successfully parsed Pixels string from Accounts table for user: ${user.id}`);
-        } catch (e) {
-          console.warn('[get-pixels] Failed to parse Pixels string from Accounts table:', e);
-        }
-      }
+    if (connectionData?.pixel_id) {
+      pixelsArray = [{
+        id: connectionData.pixel_id,
+        name: connectionData.pixel_name || 'Selected Pixel'
+      }];
+      console.log(`[get-pixels] Successfully retrieved Pixel from meta_connections table for user: ${user.id}`);
     }
 
-    // Optional filtering if adAccountId is selected
-    if (pixelsArray.length > 0 && adAccountId) {
-      const filtered = pixelsArray.filter((p: any) => p.account_id === adAccountId || p.ad_account_id === adAccountId);
-      // We only override if it actually matched something, otherwise return the whole list from DB
-      if (filtered.length > 0) {
-        pixelsArray = filtered;
+    // fallback check meta_account_selections if not in meta_connections
+    if (pixelsArray.length === 0) {
+      const { data: selectionData } = await supabase
+        .from('meta_account_selections')
+        .select('pixel_id, pixel_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (selectionData?.pixel_id) {
+        pixelsArray = [{
+          id: selectionData.pixel_id,
+          name: selectionData.pixel_name || 'Selected Pixel'
+        }];
+        console.log(`[get-pixels] Successfully retrieved Pixel from meta_account_selections for user: ${user.id}`);
       }
     }
 
