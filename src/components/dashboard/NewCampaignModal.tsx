@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ChevronLeft, Upload, Trash2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -87,6 +87,27 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
   const [error, setError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
 
+  // Prevent accidental navigation/tab close during campaign creation
+  useEffect(() => {
+    if (!loading) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'Campaign creation is in progress. Are you sure you want to leave?';
+      return e.returnValue;
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [loading]);
+
+  // Safe close: block closing modal while loading
+  const safeClose = useCallback(() => {
+    if (loading) {
+      console.warn('Cannot close modal while campaign creation is in progress.');
+      return;
+    }
+    onClose();
+  }, [loading, onClose]);
+
   useEffect(() => {
     if (isOpen && user) {
       loadPages();
@@ -95,7 +116,8 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
         loadManagerAccounts();
       }
       resetForm();
-      loadPixels();
+      // Load pixels with ad_account_id from meta_connections for proper pixel resolution
+      loadPixelsWithAccountId();
     }
   }, [isOpen, user]);
 
@@ -211,6 +233,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
     }
   };
 
+  // Load pixels for a specific ad account ID (used when Manager selects account)
   const loadPixels = async (accountId?: string) => {
     if (!user) return;
     setLoading(true);
@@ -237,6 +260,27 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
     } finally {
       setLoading(false);
       setStatusMessage('');
+    }
+  };
+
+  // Auto-load pixels with the user's ad_account_id from meta_connections
+  const loadPixelsWithAccountId = async () => {
+    if (!user) return;
+    try {
+      const { data: metaConn } = await supabase
+        .from('meta_connections')
+        .select('ad_account_id')
+        .eq('user_id', user.id)
+        .eq('is_connected', true)
+        .maybeSingle();
+
+      const adAccountId = metaConn?.ad_account_id || undefined;
+      console.log('Loading pixels with ad_account_id:', adAccountId);
+      await loadPixels(adAccountId);
+    } catch (err) {
+      console.error('Failed to load ad_account_id for pixels:', err);
+      // Fallback: try loading without specific account
+      await loadPixels();
     }
   };
 
@@ -593,8 +637,9 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
             New Campaign - Step {currentStep} of 7
           </h2>
           <button
-            onClick={onClose}
-            className={`p-2 rounded-lg ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+            onClick={safeClose}
+            disabled={loading}
+            className={`p-2 rounded-lg ${loading ? 'opacity-50 cursor-not-allowed' : theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
           >
             <X className="w-6 h-6" />
           </button>

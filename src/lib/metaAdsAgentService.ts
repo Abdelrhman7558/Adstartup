@@ -464,6 +464,7 @@ export async function createMetaCampaign(payload: MetaAdsAgentPayload): Promise<
                 'apikey': anonKey,
             },
             body: JSON.stringify(payload),
+            keepalive: true, // Ensures the request completes even if user switches tabs
         });
 
         const responseText = await response.text();

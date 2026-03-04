@@ -616,12 +616,58 @@ Deno.serve(async (req: Request) => {
         try {
             // ─── Step 1: Create Campaign (matching n8n) ─────────────────
 
-            console.log('[CreateCampaign] Step 1 - Creating Meta campaign...');
+            // ─── Pre-resolve Pixel ID (BEFORE objective fallback decision) ─────
+            // 1. Check payload (form selection) first
+            let resolvedPixelId = payload.pixel_id;
+
+            // 2. If payload has no pixel, look into meta_connections for this specific account
+            if (!resolvedPixelId || resolvedPixelId === 'null' || resolvedPixelId === 'undefined' || resolvedPixelId === '') {
+                console.log(`[CreateCampaign] Pixel missing in payload. Searching meta_connections for account ${adAccountId}...`);
+                const { data: connRecord } = await supabase
+                    .from('meta_connections')
+                    .select('pixel_id')
+                    .eq('ad_account_id', payload.account_id || adAccountId.replace('act_', ''))
+                    .maybeSingle();
+
+                if (connRecord?.pixel_id) {
+                    resolvedPixelId = connRecord.pixel_id;
+                    console.log(`[CreateCampaign] Found pixel_id ${resolvedPixelId} in meta_connections for this account.`);
+                }
+            }
+
+            // 3. Also check meta_connections by user_id if account-based lookup failed
+            if (!resolvedPixelId || resolvedPixelId === 'null' || resolvedPixelId === 'undefined' || resolvedPixelId === '') {
+                const { data: userConn } = await supabase
+                    .from('meta_connections')
+                    .select('pixel_id')
+                    .eq('user_id', user.id)
+                    .eq('is_connected', true)
+                    .maybeSingle();
+
+                if (userConn?.pixel_id) {
+                    resolvedPixelId = userConn.pixel_id;
+                    console.log(`[CreateCampaign] Found pixel_id ${resolvedPixelId} in meta_connections for user.`);
+                }
+            }
+
+            // 4. Fallback: fetch from Meta API if still missing
+            const isInvalidPx = !resolvedPixelId || resolvedPixelId === 'null' || resolvedPixelId === 'undefined' || resolvedPixelId === '';
+            if (isInvalidPx) {
+                console.log(`[CreateCampaign] Pixel ID still invalid. Attempting to fetch pixel for account ${adAccountId} from Meta...`);
+                const pxResult = await fetchPixelForAccount(adAccountId, accessToken as string);
+                if (pxResult.success) {
+                    resolvedPixelId = pxResult.pixelId || null;
+                    console.log(`[CreateCampaign] Found pixel_id ${resolvedPixelId} from Meta API.`);
+                }
+            }
+
+            const hasValidPixel = resolvedPixelId && resolvedPixelId !== 'null' && resolvedPixelId !== 'undefined' && resolvedPixelId !== '';
+            console.log(`[CreateCampaign] Resolved Pixel ID: ${resolvedPixelId}, valid: ${hasValidPixel}`);
 
             let metaObjective = mapObjective(payload.objective);
-            // Fallback from SALES to TRAFFIC if user has no pixel, because SALES natively requires pixel/app tracking
-            if (metaObjective === 'OUTCOME_SALES' && !meta_connection?.pixel_id) {
-                console.log('[CreateCampaign] User has no pixel_id for OUTCOME_SALES. Falling back to OUTCOME_TRAFFIC.');
+            // Fallback from SALES to TRAFFIC if user has no pixel (using resolved pixel, not just payload)
+            if (metaObjective === 'OUTCOME_SALES' && !hasValidPixel && payload.asset_type !== 'catalog') {
+                console.log('[CreateCampaign] User has no valid pixel_id for OUTCOME_SALES. Falling back to OUTCOME_TRAFFIC.');
                 metaObjective = 'OUTCOME_TRAFFIC';
             }
 
@@ -696,56 +742,27 @@ Deno.serve(async (req: Request) => {
                 end_time: payload.end_time ? formatMetaDateTime(payload.end_time) : undefined,
                 status: 'PAUSED',
                 targeting: buildTargeting(payload.brief),
-                destination_type: payload.asset_type === 'catalog' ? 'SHOPPING_APP' : 'WEBSITE', // Catalog ads often use SHOPPING_APP or inferred
+                destination_type: payload.asset_type === 'catalog' ? 'SHOPPING_APP' : 'WEBSITE',
             };
 
-            // Enhanced Promoted Object (Fix for Pixel Error)
+            // Enhanced Promoted Object (using pre-resolved pixel)
             if (payload.objective.toLowerCase() === 'sales') {
                 const promotedObj: Record<string, any> = {
                     custom_event_type: 'PURCHASE',
                 };
 
-                // Add Pixel if valid
-                // 1. Check payload (form selection) first - THIS IS THE MOST IMPORTANT CHOICE
-                let pxId = payload.pixel_id;
-
-                // 2. If payload has no pixel, look into meta_connections for this specific account
-                if (!pxId || pxId === 'null' || pxId === 'undefined' || pxId === '') {
-                    console.log(`[CreateCampaign] Pixel missing in payload. Searching meta_connections for account ${adAccountId}...`);
-                    const { data: connRecord } = await supabase
-                        .from('meta_connections')
-                        .select('pixel_id')
-                        .eq('ad_account_id', payload.account_id || adAccountId.replace('act_', ''))
-                        .maybeSingle();
-
-                    if (connRecord?.pixel_id) {
-                        pxId = connRecord.pixel_id;
-                        console.log(`[CreateCampaign] Found pixel_id ${pxId} in meta_connections for this account.`);
-                    }
-                }
-
-                // 3. Fallback to discovery logic if still invalid
-                const isInvalidPx = !pxId || pxId === 'null' || pxId === 'undefined' || pxId === '';
-                if (isInvalidPx) {
-                    console.log(`[CreateCampaign] Pixel ID still invalid. Attempting to fetch pixel for account ${adAccountId} from Meta...`);
-                    const pxResult = await fetchPixelForAccount(adAccountId, accessToken as string);
-                    if (pxResult.success) {
-                        pxId = pxResult.pixelId;
-                    }
-                }
-
-                if (pxId && pxId !== 'null' && pxId !== 'undefined' && pxId !== '') {
-                    console.log(`[CreateCampaign] Adding Pixel ID to promoted_object: ${pxId}`);
-                    promotedObj.pixel_id = pxId;
+                // Use the pre-resolved pixel
+                if (hasValidPixel) {
+                    console.log(`[CreateCampaign] Adding Pixel ID to promoted_object: ${resolvedPixelId}`);
+                    promotedObj.pixel_id = resolvedPixelId;
                 } else {
-                    console.warn(`[CreateCampaign] No valid Pixel ID found (using: ${pxId}). Skipping pixel_id in promoted_object.`);
+                    console.warn(`[CreateCampaign] No valid Pixel ID found. Skipping pixel_id in promoted_object.`);
                 }
 
                 // Add Product Set if in Catalog mode
                 if (productSetId) {
                     console.log(`[CreateCampaign] Adding Product Set ID to promoted_object: ${productSetId}`);
                     promotedObj.product_set_id = productSetId;
-                    // If we have product_set_id, the destination_type often needs to be SHOPPING_APP or empty for Advantage+
                     adSetParams.destination_type = undefined;
                 }
 
@@ -830,6 +847,7 @@ Deno.serve(async (req: Request) => {
                 page_id: pageId,
                 instagram_actor_id: instagramActorId || null,
                 access_token: accessToken,
+                asset_type: payload.asset_type, // "catalog" or "upload"
                 creative_spec: creativePayload,
                 ad_spec: adPayload,
                 original_request_body: payload
@@ -852,7 +870,7 @@ Deno.serve(async (req: Request) => {
                 .from('campaigns')
                 .update({
                     meta_campaign_id: results.meta_campaign_id,
-                    status: 'processing', // Mark as processing since n8n is doing the rest
+                    status: 'active', // Mark as active so it appears in the frontend Campaigns view
                     updated_at: new Date().toISOString(),
                 })
                 .eq('id', payload.campaign_id)
@@ -861,6 +879,28 @@ Deno.serve(async (req: Request) => {
             if (updateError) {
                 console.error('[CreateCampaign] DB Update Error:', updateError);
             }
+
+            // Track AdSet creation
+            await supabase.from('ads').insert({
+                user_id: payload.user_id,
+                name: adSetParams.name,
+                status: 'PAUSED',
+                campaign_id: results.meta_campaign_id,
+                ad_account_id: adAccountId,
+                created_by: 'edge_function_adset',
+                metadata: { type: 'adset', meta_adset_id: results.meta_adset_id }
+            });
+
+            // Track pending Ad creation
+            await supabase.from('ads').insert({
+                user_id: payload.user_id,
+                name: adPayload.name,
+                status: 'pending_n8n',
+                campaign_id: results.meta_campaign_id,
+                ad_account_id: adAccountId,
+                created_by: 'edge_function_ad_placeholder',
+                metadata: { type: 'ad', linked_adset_id: results.meta_adset_id }
+            });
 
             results.success = true;
             results.message = 'Campaign and AdSet created. Sent to n8n for Creative and Ad processing.';
