@@ -617,52 +617,69 @@ Deno.serve(async (req: Request) => {
             // ─── Step 1: Create Campaign (matching n8n) ─────────────────
 
             // ─── Pre-resolve Pixel ID (BEFORE objective fallback decision) ─────
-            // 1. Check payload (form selection) first
-            let resolvedPixelId = payload.pixel_id;
+            // IMPORTANT: Always validate pixel against the ACTUAL ad account via Meta API,
+            // because stored pixel IDs may belong to a different account.
 
-            // 2. If payload has no pixel, look into meta_connections for this specific account
-            if (!resolvedPixelId || resolvedPixelId === 'null' || resolvedPixelId === 'undefined' || resolvedPixelId === '') {
-                console.log(`[CreateCampaign] Pixel missing in payload. Searching meta_connections for account ${adAccountId}...`);
-                const { data: connRecord } = await supabase
-                    .from('meta_connections')
-                    .select('pixel_id')
-                    .eq('ad_account_id', payload.account_id || adAccountId.replace('act_', ''))
-                    .maybeSingle();
-
-                if (connRecord?.pixel_id) {
-                    resolvedPixelId = connRecord.pixel_id;
-                    console.log(`[CreateCampaign] Found pixel_id ${resolvedPixelId} in meta_connections for this account.`);
-                }
+            // 1. Collect candidate pixel IDs from all sources
+            const candidatePixels: string[] = [];
+            if (payload.pixel_id && payload.pixel_id !== 'null' && payload.pixel_id !== 'undefined' && payload.pixel_id !== '') {
+                candidatePixels.push(payload.pixel_id);
+            }
+            if (meta_connection?.pixel_id && meta_connection.pixel_id !== 'null') {
+                candidatePixels.push(meta_connection.pixel_id);
             }
 
-            // 3. Also check meta_connections by user_id if account-based lookup failed
-            if (!resolvedPixelId || resolvedPixelId === 'null' || resolvedPixelId === 'undefined' || resolvedPixelId === '') {
-                const { data: userConn } = await supabase
-                    .from('meta_connections')
-                    .select('pixel_id')
-                    .eq('user_id', user.id)
-                    .eq('is_connected', true)
-                    .maybeSingle();
-
-                if (userConn?.pixel_id) {
-                    resolvedPixelId = userConn.pixel_id;
-                    console.log(`[CreateCampaign] Found pixel_id ${resolvedPixelId} in meta_connections for user.`);
-                }
+            // Check meta_connections DB for additional pixel candidates
+            const { data: connPixel } = await supabase
+                .from('meta_connections')
+                .select('pixel_id')
+                .eq('user_id', user.id)
+                .eq('is_connected', true)
+                .maybeSingle();
+            if (connPixel?.pixel_id && !candidatePixels.includes(connPixel.pixel_id)) {
+                candidatePixels.push(connPixel.pixel_id);
             }
 
-            // 4. Fallback: fetch from Meta API if still missing
-            const isInvalidPx = !resolvedPixelId || resolvedPixelId === 'null' || resolvedPixelId === 'undefined' || resolvedPixelId === '';
-            if (isInvalidPx) {
-                console.log(`[CreateCampaign] Pixel ID still invalid. Attempting to fetch pixel for account ${adAccountId} from Meta...`);
-                const pxResult = await fetchPixelForAccount(adAccountId, accessToken as string);
-                if (pxResult.success) {
-                    resolvedPixelId = pxResult.pixelId || null;
-                    console.log(`[CreateCampaign] Found pixel_id ${resolvedPixelId} from Meta API.`);
+            console.log(`[CreateCampaign] Candidate pixels from DB/payload: [${candidatePixels.join(', ')}]`);
+
+            // 2. Fetch VALID pixels from Meta API for the ACTUAL ad account
+            let resolvedPixelId: string | null = null;
+            const accountPixelsResult = await fetchPixelForAccount(adAccountId, accessToken as string);
+
+            if (accountPixelsResult.success && accountPixelsResult.pixelId) {
+                // fetchPixelForAccount returns the first pixel; let's also check if any candidate matches
+                // For a full match, we need to fetch all pixels... let's use metaApiGet directly
+                const allPixelsResult = await metaApiGet(
+                    `/${adAccountId}/adspixels`,
+                    accessToken as string,
+                    { fields: 'id,name' }
+                );
+
+                const accountPixelIds: string[] = (allPixelsResult.data?.data || []).map((p: any) => p.id);
+                console.log(`[CreateCampaign] Valid pixels for account ${adAccountId}: [${accountPixelIds.join(', ')}]`);
+
+                // 3. Check if any candidate pixel belongs to this account
+                for (const candidate of candidatePixels) {
+                    if (accountPixelIds.includes(candidate)) {
+                        resolvedPixelId = candidate;
+                        console.log(`[CreateCampaign] ✅ Candidate pixel ${candidate} is valid for this account.`);
+                        break;
+                    } else {
+                        console.warn(`[CreateCampaign] ⚠️ Candidate pixel ${candidate} does NOT belong to account ${adAccountId}. Skipping.`);
+                    }
                 }
+
+                // 4. If no candidate matched, use the first pixel from the account
+                if (!resolvedPixelId && accountPixelIds.length > 0) {
+                    resolvedPixelId = accountPixelIds[0];
+                    console.log(`[CreateCampaign] Using account's first pixel: ${resolvedPixelId}`);
+                }
+            } else {
+                console.warn(`[CreateCampaign] Could not fetch pixels from Meta API for account ${adAccountId}: ${accountPixelsResult.error}`);
             }
 
-            const hasValidPixel = resolvedPixelId && resolvedPixelId !== 'null' && resolvedPixelId !== 'undefined' && resolvedPixelId !== '';
-            console.log(`[CreateCampaign] Resolved Pixel ID: ${resolvedPixelId}, valid: ${hasValidPixel}`);
+            const hasValidPixel = !!resolvedPixelId;
+            console.log(`[CreateCampaign] Final Resolved Pixel ID: ${resolvedPixelId}, valid: ${hasValidPixel}`);
 
             let metaObjective = mapObjective(payload.objective);
             // Fallback from SALES to TRAFFIC if user has no pixel (using resolved pixel, not just payload)
