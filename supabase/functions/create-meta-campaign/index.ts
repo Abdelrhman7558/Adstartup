@@ -434,6 +434,131 @@ function formatMetaDateTime(dt: string, isStart = false): string {
     }
 }
 
+// ─── Strategy Selection Engine (T.O.S Framework) ───────────────
+
+interface StrategyConfig {
+    name: string;
+    display_name: string;
+    budget_type: 'CBO' | 'ABO';
+    campaign_budget_optimization: boolean;
+    adset_count: number | 'per_product' | 'per_creative';
+    ads_per_adset: number | 'flexible';
+    daily_budget_per_adset: number;
+    flexible_ad: boolean;
+    optimization_goal: string;
+    is_catalog: boolean;
+    description: string;
+}
+
+function selectStrategy(assetType: string, brief: Record<string, any>, payload: CampaignPayload): StrategyConfig {
+    const isCatalog = assetType === 'catalog';
+    const assetsCount = payload.assets?.length || 0;
+    const dailyBudget = payload.daily_budget || 500;
+
+    // Strategy override from payload or brief
+    const strategyOverride = (payload as any).strategy_override || brief?.strategy;
+
+    if (strategyOverride) {
+        console.log(`[Agent] Strategy override detected: ${strategyOverride}`);
+    }
+
+    // ─── CATALOG STRATEGIES ─────────────────────────────────────
+    if (isCatalog) {
+        switch (strategyOverride) {
+            case 'catalog_carousel_10':
+                return {
+                    name: 'catalog_carousel_10',
+                    display_name: 'ABO – 10 Carousel Ads per Single Ad Set',
+                    budget_type: 'ABO',
+                    campaign_budget_optimization: false,
+                    adset_count: 1,
+                    ads_per_adset: 10,
+                    daily_budget_per_adset: 500,
+                    flexible_ad: false,
+                    optimization_goal: 'OFFSITE_CONVERSIONS',
+                    is_catalog: true,
+                    description: 'One audience. One budget. Ten carousel stories.',
+                };
+            case 'catalog_carousel_isolated':
+                return {
+                    name: 'catalog_carousel_isolated',
+                    display_name: 'ABO – Single Carousel Ad per Ad Set',
+                    budget_type: 'ABO',
+                    campaign_budget_optimization: false,
+                    adset_count: 5,
+                    ads_per_adset: 1,
+                    daily_budget_per_adset: 150,
+                    flexible_ad: false,
+                    optimization_goal: 'OFFSITE_CONVERSIONS',
+                    is_catalog: true,
+                    description: 'One carousel. One ad set. One budget. No interference.',
+                };
+            default:
+                // Default catalog: Catalog Format Blender (3 format ads)
+                return {
+                    name: 'catalog_format_blender',
+                    display_name: 'Catalog Format Blender – 3 Ads Campaign',
+                    budget_type: 'ABO',
+                    campaign_budget_optimization: false,
+                    adset_count: 1,
+                    ads_per_adset: 3,
+                    daily_budget_per_adset: dailyBudget || 500,
+                    flexible_ad: false,
+                    optimization_goal: 'OFFSITE_CONVERSIONS',
+                    is_catalog: true,
+                    description: 'One audience. One budget. Three formats. Let users decide.',
+                };
+        }
+    }
+
+    // ─── UPLOAD STRATEGIES ──────────────────────────────────────
+    switch (strategyOverride) {
+        case 'abo_multi_adset':
+            return {
+                name: 'abo_multi_adset',
+                display_name: 'ABO Multi-Adset & Ads',
+                budget_type: 'ABO',
+                campaign_budget_optimization: false,
+                adset_count: 'per_product',
+                ads_per_adset: Math.min(Math.max(assetsCount, 3), 5),
+                daily_budget_per_adset: 250,
+                flexible_ad: false,
+                optimization_goal: 'OFFSITE_CONVERSIONS',
+                is_catalog: false,
+                description: 'One product. One ad set. Fixed budget. Multiple clean creatives.',
+            };
+        case 'abo_single_ads':
+            return {
+                name: 'abo_single_ads',
+                display_name: 'ABO Single-Ads',
+                budget_type: 'ABO',
+                campaign_budget_optimization: false,
+                adset_count: 'per_creative',
+                ads_per_adset: 1,
+                daily_budget_per_adset: 250,
+                flexible_ad: false,
+                optimization_goal: 'OFFSITE_CONVERSIONS',
+                is_catalog: false,
+                description: 'One creative. One ad set. One budget. No bias.',
+            };
+        default:
+            // Default upload: Flexible Blender Mode
+            return {
+                name: 'flexible_blender',
+                display_name: 'Flexible Single Adset & Ad (Blender Mode)',
+                budget_type: 'ABO',
+                campaign_budget_optimization: false,
+                adset_count: 1,
+                ads_per_adset: 'flexible',
+                daily_budget_per_adset: dailyBudget || 500,
+                flexible_ad: true,
+                optimization_goal: 'OFFSITE_CONVERSIONS',
+                is_catalog: false,
+                description: 'One ad set. One ad. All creatives inside. Let the algorithm blend.',
+            };
+    }
+}
+
 // ─── Main Handler ───────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -592,11 +717,45 @@ Deno.serve(async (req: Request) => {
             );
         }
 
+        // ─── Fetch User Brief ───────────────────────────────────────
+        let userBrief: Record<string, any> = payload.brief || {};
+        try {
+            const { data: briefRecord } = await supabase
+                .from('campaign_briefs')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (briefRecord) {
+                // Merge brief data (could be stored as 'data' JSON or flat columns)
+                userBrief = { ...userBrief, ...(briefRecord.data || briefRecord) };
+                console.log('[Agent] Brief loaded from campaign_briefs:', Object.keys(userBrief).length, 'fields');
+            } else {
+                console.warn('[Agent] No brief found in campaign_briefs. Using payload brief.');
+            }
+        } catch (briefErr: any) {
+            console.warn('[Agent] Failed to fetch brief:', briefErr?.message);
+        }
+
+        // ─── Select Campaign Strategy ───────────────────────────────
+        const strategy = selectStrategy(payload.asset_type, userBrief, payload);
+        console.log('[Agent] Selected strategy:', JSON.stringify({
+            name: strategy.name,
+            display_name: strategy.display_name,
+            budget_type: strategy.budget_type,
+            adset_count: strategy.adset_count,
+            ads_per_adset: strategy.ads_per_adset,
+            flexible_ad: strategy.flexible_ad,
+        }));
+
         const results: Record<string, any> = {
             meta_campaign_id: null,
             meta_adset_ids: [],
             meta_creative_id: null,
             meta_ad_ids: [],
+            strategy: strategy.name,
         };
 
         const createdResources: { type: string; id: string }[] = [];
@@ -693,8 +852,14 @@ Deno.serve(async (req: Request) => {
                 objective: metaObjective,
                 status: 'PAUSED',
                 special_ad_categories: [],
-                is_adset_budget_sharing_enabled: false,
+                is_adset_budget_sharing_enabled: strategy.campaign_budget_optimization ? true : false,
             };
+
+            // CBO campaigns need campaign-level budget
+            if (strategy.budget_type === 'CBO') {
+                campaignParams.daily_budget = budgetToCents(payload.daily_budget);
+                campaignParams.is_adset_budget_sharing_enabled = true;
+            }
 
             console.log('[CreateCampaign] Step 1 params:', JSON.stringify(campaignParams, null, 2));
 
@@ -748,13 +913,18 @@ Deno.serve(async (req: Request) => {
                 }
             }
 
+            // Use strategy budget (ABO: per-adset budget, CBO: no adset budget)
+            const adsetBudget = strategy.budget_type === 'ABO'
+                ? budgetToCents(strategy.daily_budget_per_adset || payload.daily_budget)
+                : undefined;
+
             const adSetParams: Record<string, any> = {
                 name: `${payload.campaign_name} - AdSet`,
                 campaign_id: results.meta_campaign_id,
                 billing_event: 'IMPRESSIONS',
                 optimization_goal: mapOptimizationGoal(payload.goal, payload.objective),
                 bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
-                daily_budget: budgetToCents(payload.daily_budget),
+                ...(adsetBudget ? { daily_budget: adsetBudget } : {}),
                 start_time: formatMetaDateTime(payload.start_time, true),
                 end_time: payload.end_time ? formatMetaDateTime(payload.end_time) : undefined,
                 status: 'PAUSED',
@@ -763,7 +933,7 @@ Deno.serve(async (req: Request) => {
             };
 
             // Enhanced Promoted Object (using pre-resolved pixel)
-            if (payload.objective.toLowerCase() === 'sales') {
+            if (metaObjective === 'OUTCOME_SALES') {
                 const promotedObj: Record<string, any> = {
                     custom_event_type: 'PURCHASE',
                 };
@@ -772,8 +942,6 @@ Deno.serve(async (req: Request) => {
                 if (hasValidPixel) {
                     console.log(`[CreateCampaign] Adding Pixel ID to promoted_object: ${resolvedPixelId}`);
                     promotedObj.pixel_id = resolvedPixelId;
-                } else {
-                    console.warn(`[CreateCampaign] No valid Pixel ID found. Skipping pixel_id in promoted_object.`);
                 }
 
                 // Add Product Set if in Catalog mode
@@ -788,7 +956,7 @@ Deno.serve(async (req: Request) => {
                     console.log(`[CreateCampaign] Final promoted_object:`, JSON.stringify(promotedObj));
                     adSetParams.promoted_object = promotedObj;
                 } else {
-                    console.error(`[CreateCampaign] Warning: SALES objective used but no Pixel or Product Set found.`);
+                    console.warn(`[CreateCampaign] SALES objective but no Pixel or Product Set. Will fallback to TRAFFIC on failure.`);
                 }
             }
 
@@ -802,60 +970,42 @@ Deno.serve(async (req: Request) => {
 
             let adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
 
-            // ─── RETRY: If pixel causes error, retry without pixel ─────
-            const isPixelError = !adSetResult.success && (
-                (adSetResult.error || '').includes('1487429') ||
-                (adSetResult.error || '').toLowerCase().includes('pixel') ||
-                (adSetResult.error || '').includes('بيكسل')
-            );
-
-            if (isPixelError) {
-                console.warn(`[CreateCampaign] ⚠️ Pixel error detected! Retrying WITHOUT pixel...`);
+            // ─── UNIVERSAL RETRY: If AdSet fails with SALES objective, fallback to TRAFFIC ─────
+            if (!adSetResult.success && metaObjective === 'OUTCOME_SALES') {
+                console.warn(`[CreateCampaign] ⚠️ AdSet creation FAILED with SALES objective. Falling back to TRAFFIC...`);
                 console.warn(`[CreateCampaign] Original error: ${adSetResult.error}`);
 
-                // Remove pixel from promoted_object
-                if (adSetParams.promoted_object) {
-                    delete adSetParams.promoted_object.pixel_id;
-                    // If promoted_object is now empty (no product_set_id either), remove it
-                    if (!adSetParams.promoted_object.product_set_id) {
-                        delete adSetParams.promoted_object;
-                    }
+                // Delete the SALES campaign
+                try {
+                    await metaApiPost(`/${results.meta_campaign_id}`, accessToken, { status: 'DELETED' });
+                    console.log(`[CreateCampaign] Deleted SALES campaign: ${results.meta_campaign_id}`);
+                    createdResources.pop(); // Remove from cleanup list
+                } catch (e: any) {
+                    console.warn(`[CreateCampaign] Failed to delete old campaign: ${e.message}`);
                 }
 
-                // We also need to re-create the campaign with TRAFFIC objective
-                // because SALES without pixel often causes issues
-                if (metaObjective === 'OUTCOME_SALES' && !adSetParams.promoted_object?.product_set_id) {
-                    console.log('[CreateCampaign] Switching to OUTCOME_TRAFFIC objective and recreating campaign...');
+                // Recreate campaign with TRAFFIC objective
+                metaObjective = 'OUTCOME_TRAFFIC';
+                const trafficCampaignParams = {
+                    ...campaignParams,
+                    objective: 'OUTCOME_TRAFFIC',
+                };
+                console.log('[CreateCampaign] Recreating campaign with TRAFFIC:', JSON.stringify(trafficCampaignParams, null, 2));
+                const retryCampaignResult = await metaApiPost(`/${adAccountId}/campaigns`, accessToken, trafficCampaignParams);
 
-                    // Delete the SALES campaign
-                    try {
-                        await metaApiPost(`/${results.meta_campaign_id}`, accessToken, { status: 'DELETED' });
-                        console.log(`[CreateCampaign] Deleted SALES campaign: ${results.meta_campaign_id}`);
-                    } catch (e: any) {
-                        console.warn(`[CreateCampaign] Failed to delete old campaign: ${e.message}`);
-                    }
-
-                    // Recreate with TRAFFIC
-                    const trafficCampaignParams = {
-                        ...campaignParams,
-                        objective: 'OUTCOME_TRAFFIC',
-                    };
-                    const retryCampaignResult = await metaApiPost(`/${adAccountId}/campaigns`, accessToken, trafficCampaignParams);
-
-                    if (!retryCampaignResult.success) {
-                        throw new Error(`[Step 1 Retry - Campaign TRAFFIC] ${retryCampaignResult.error}`);
-                    }
-
-                    results.meta_campaign_id = retryCampaignResult.data.id;
-                    createdResources.push({ type: 'campaign', id: results.meta_campaign_id });
-                    console.log('[CreateCampaign] ✅ Campaign recreated with TRAFFIC:', results.meta_campaign_id);
-
-                    // Update adSet params for new campaign
-                    adSetParams.campaign_id = results.meta_campaign_id;
-                    adSetParams.optimization_goal = 'LINK_CLICKS';
-                    adSetParams.destination_type = 'WEBSITE';
-                    delete adSetParams.promoted_object;
+                if (!retryCampaignResult.success) {
+                    throw new Error(`[Step 1 Retry - Campaign TRAFFIC] ${retryCampaignResult.error}`);
                 }
+
+                results.meta_campaign_id = retryCampaignResult.data.id;
+                createdResources.push({ type: 'campaign', id: results.meta_campaign_id });
+                console.log('[CreateCampaign] ✅ Campaign recreated with TRAFFIC:', results.meta_campaign_id);
+
+                // Rebuild AdSet params for TRAFFIC (no promoted_object needed)
+                adSetParams.campaign_id = results.meta_campaign_id;
+                adSetParams.optimization_goal = 'LINK_CLICKS';
+                adSetParams.destination_type = 'WEBSITE';
+                delete adSetParams.promoted_object;
 
                 console.log('[CreateCampaign] Step 2 Retry params:', JSON.stringify(adSetParams, null, 2));
                 adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
@@ -867,7 +1017,7 @@ Deno.serve(async (req: Request) => {
                     debug_step: 'step2_adset',
                     params: adSetParams,
                     result: adSetResult,
-                    pixel_retry: isPixelError,
+                    fallback_used: metaObjective === 'OUTCOME_TRAFFIC' && payload.objective.toLowerCase() === 'sales',
                     timestamp: new Date().toISOString()
                 },
                 updated_at: new Date().toISOString()
@@ -917,7 +1067,7 @@ Deno.serve(async (req: Request) => {
                 meta_campaign_id: results.meta_campaign_id, // Meta ID from Step 1
                 meta_adset_id: results.meta_adset_id, // Meta ID from Step 2
                 ad_account_id: adAccountId,
-                pixel_id: payload.pixel_id || meta_connection?.pixel_id,
+                pixel_id: resolvedPixelId || payload.pixel_id || meta_connection?.pixel_id,
                 catalog_id: payload.catalog_id || meta_connection?.catalog_id,
                 page_id: pageId,
                 instagram_actor_id: instagramActorId || null,
@@ -925,6 +1075,18 @@ Deno.serve(async (req: Request) => {
                 asset_type: payload.asset_type, // "catalog" or "upload"
                 creative_spec: creativePayload,
                 ad_spec: adPayload,
+                // ─── AI Agent Context ─────────────────────────────────
+                strategy: {
+                    name: strategy.name,
+                    display_name: strategy.display_name,
+                    budget_type: strategy.budget_type,
+                    adset_count: strategy.adset_count,
+                    ads_per_adset: strategy.ads_per_adset,
+                    flexible_ad: strategy.flexible_ad,
+                    daily_budget_per_adset: strategy.daily_budget_per_adset,
+                    description: strategy.description,
+                },
+                brief: userBrief,
                 original_request_body: payload
             };
 
