@@ -800,7 +800,66 @@ Deno.serve(async (req: Request) => {
 
             console.log('[CreateCampaign] Step 2 Final params:', JSON.stringify(adSetParams, null, 2));
 
-            const adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+            let adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+
+            // ─── RETRY: If pixel causes error, retry without pixel ─────
+            const isPixelError = !adSetResult.success && (
+                (adSetResult.error || '').includes('1487429') ||
+                (adSetResult.error || '').toLowerCase().includes('pixel') ||
+                (adSetResult.error || '').includes('بيكسل')
+            );
+
+            if (isPixelError) {
+                console.warn(`[CreateCampaign] ⚠️ Pixel error detected! Retrying WITHOUT pixel...`);
+                console.warn(`[CreateCampaign] Original error: ${adSetResult.error}`);
+
+                // Remove pixel from promoted_object
+                if (adSetParams.promoted_object) {
+                    delete adSetParams.promoted_object.pixel_id;
+                    // If promoted_object is now empty (no product_set_id either), remove it
+                    if (!adSetParams.promoted_object.product_set_id) {
+                        delete adSetParams.promoted_object;
+                    }
+                }
+
+                // We also need to re-create the campaign with TRAFFIC objective
+                // because SALES without pixel often causes issues
+                if (metaObjective === 'OUTCOME_SALES' && !adSetParams.promoted_object?.product_set_id) {
+                    console.log('[CreateCampaign] Switching to OUTCOME_TRAFFIC objective and recreating campaign...');
+
+                    // Delete the SALES campaign
+                    try {
+                        await metaApiPost(`/${results.meta_campaign_id}`, accessToken, { status: 'DELETED' });
+                        console.log(`[CreateCampaign] Deleted SALES campaign: ${results.meta_campaign_id}`);
+                    } catch (e: any) {
+                        console.warn(`[CreateCampaign] Failed to delete old campaign: ${e.message}`);
+                    }
+
+                    // Recreate with TRAFFIC
+                    const trafficCampaignParams = {
+                        ...campaignParams,
+                        objective: 'OUTCOME_TRAFFIC',
+                    };
+                    const retryCampaignResult = await metaApiPost(`/${adAccountId}/campaigns`, accessToken, trafficCampaignParams);
+
+                    if (!retryCampaignResult.success) {
+                        throw new Error(`[Step 1 Retry - Campaign TRAFFIC] ${retryCampaignResult.error}`);
+                    }
+
+                    results.meta_campaign_id = retryCampaignResult.data.id;
+                    createdResources.push({ type: 'campaign', id: results.meta_campaign_id });
+                    console.log('[CreateCampaign] ✅ Campaign recreated with TRAFFIC:', results.meta_campaign_id);
+
+                    // Update adSet params for new campaign
+                    adSetParams.campaign_id = results.meta_campaign_id;
+                    adSetParams.optimization_goal = 'LINK_CLICKS';
+                    adSetParams.destination_type = 'WEBSITE';
+                    delete adSetParams.promoted_object;
+                }
+
+                console.log('[CreateCampaign] Step 2 Retry params:', JSON.stringify(adSetParams, null, 2));
+                adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
+            }
 
             await supabase.from('meta_account_selections').upsert({
                 user_id: user.id,
@@ -808,15 +867,14 @@ Deno.serve(async (req: Request) => {
                     debug_step: 'step2_adset',
                     params: adSetParams,
                     result: adSetResult,
+                    pixel_retry: isPixelError,
                     timestamp: new Date().toISOString()
                 },
                 updated_at: new Date().toISOString()
             }, { onConflict: 'user_id' });
 
             if (!adSetResult.success) {
-                const pxAttempted = adSetParams.promoted_object?.pixel_id || 'NONE';
-                const pxPayload = payload.pixel_id || 'NONE';
-                throw new Error(`[Step 2 - AdSet] ${adSetResult.error} (Attempted Pixel: ${pxAttempted}, Payload Pixel: ${pxPayload})`);
+                throw new Error(`[Step 2 - AdSet] ${adSetResult.error}`);
             }
 
             results.meta_adset_id = adSetResult.data.id;
