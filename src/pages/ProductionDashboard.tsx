@@ -302,10 +302,10 @@ export default function ProductionDashboard() {
               {!trialExpired && (
                 <button
                   onClick={() => setShowNewCampaignModal(true)}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
+                  className="px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  New Campaign
+                  <span className="hidden sm:inline">New Campaign</span>
                 </button>
               )}
 
@@ -461,6 +461,17 @@ export default function ProductionDashboard() {
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
+      )}
+
+      {/* Mobile FAB: New Campaign (always visible on small screens) */}
+      {!trialExpired && (
+        <button
+          onClick={() => setShowNewCampaignModal(true)}
+          className="fixed bottom-6 right-6 z-50 sm:hidden w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95"
+          title="New Campaign"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
       )}
 
       <SupportChatbot />
