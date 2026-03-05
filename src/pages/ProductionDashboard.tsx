@@ -39,6 +39,13 @@ export default function ProductionDashboard() {
   const [trialActive, setTrialActive] = useState(false);
   const [showMetaManager, setShowMetaManager] = useState(false);
 
+  // Manager check at component level (needed for button visibility)
+  const MANAGER_EMAILS = ['jihadalcc@gmail.com', '7bd02025@gmail.com'];
+  const isManager = !!(user?.email && (
+    MANAGER_EMAILS.includes(user.email.toLowerCase()) ||
+    isManagerPlanUser(user.email)
+  ));
+
   useEffect(() => {
     if (user) {
       loadUserData();
@@ -299,7 +306,7 @@ export default function ProductionDashboard() {
             </div>
 
             <div className="flex items-center gap-4">
-              {!trialExpired && (
+              {(!trialExpired || isManager) && (
                 <button
                   onClick={() => setShowNewCampaignModal(true)}
                   className="px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
@@ -464,7 +471,7 @@ export default function ProductionDashboard() {
       )}
 
       {/* Mobile FAB: New Campaign (always visible on small screens) */}
-      {!trialExpired && (
+      {(!trialExpired || isManager) && (
         <button
           onClick={() => setShowNewCampaignModal(true)}
           className="fixed bottom-6 right-6 z-50 sm:hidden w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95"

@@ -100,7 +100,7 @@ const Pricing = () => {
                   onClick={handleTrialClick}
                   className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all inline-flex items-center justify-center space-x-2 shadow-lg shadow-green-600/25"
                 >
-                  <span>Trial 7-days Free</span>
+                  <span>Trial 14-days Free</span>
                   <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
@@ -122,7 +122,7 @@ const Pricing = () => {
 
         <div className="mt-12 text-center">
           <p className="text-gray-600 mb-6">
-            7-day free trial. No credit card required. Cancel anytime.
+            14-day free trial. No credit card required. Cancel anytime.
           </p>
           <div className="flex items-center justify-center space-x-6 text-sm text-gray-500">
             <div className="flex items-center space-x-2">

@@ -203,7 +203,7 @@ export default function Plans() {
           transition={{ duration: 0.6, delay: 0.4 }}
           className="text-center mt-16 text-gray-400"
         >
-          <p>All plans include a 7-day free trial. Cancel anytime.</p>
+          <p>All plans include a 14-day free trial. Cancel anytime.</p>
         </motion.div>
       </div>
     </div>

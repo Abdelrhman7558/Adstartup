@@ -12,7 +12,7 @@ export const trialService = {
   async createTrial(userId: string): Promise<void> {
     const startDate = new Date();
     const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 7);
+    endDate.setDate(endDate.getDate() + 14);
 
     const { error } = await supabase
       .from('users')

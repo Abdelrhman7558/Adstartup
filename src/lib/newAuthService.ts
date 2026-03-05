@@ -150,7 +150,7 @@ class NewAuthService {
       console.error('Error starting trial:', error);
 
       const trialEndDate = new Date();
-      trialEndDate.setDate(trialEndDate.getDate() + 7);
+      trialEndDate.setDate(trialEndDate.getDate() + 14);
 
       await supabase
         .from('users')
