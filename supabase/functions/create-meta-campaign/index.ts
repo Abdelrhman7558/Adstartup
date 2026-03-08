@@ -1050,6 +1050,8 @@ Deno.serve(async (req: Request) => {
                 // ═══ CATALOG STRATEGIES ═══════════════════════════════════
                 if (strategy.name === 'catalog_format_blender') {
                     // 3 Ads: Single Image, Carousel, Collection
+                    // IMPORTANT: For catalog ads, template_data defaults to carousel.
+                    // Single Image MUST have force_single_link: true to render as single product.
                     creative_specs.push(
                         {
                             name: `${payload.campaign_name} - Single Image`,
@@ -1061,6 +1063,7 @@ Deno.serve(async (req: Request) => {
                                     message: payload.description || 'Shop now!',
                                     link: websiteUrl,
                                     call_to_action: { type: 'SHOP_NOW' },
+                                    force_single_link: true,
                                 },
                             },
                             product_set_id: productSetId,
@@ -1090,6 +1093,8 @@ Deno.serve(async (req: Request) => {
                                     message: payload.description || 'Discover more products!',
                                     link: websiteUrl,
                                     call_to_action: { type: 'SHOP_NOW' },
+                                    retailer_item_ids: [],
+                                    applink_treatment: 'web_only',
                                 },
                             },
                             product_set_id: productSetId,
