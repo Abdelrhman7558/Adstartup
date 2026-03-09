@@ -175,11 +175,14 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // 1. Save connection & long token
-    const { data: existingConn } = await supabase
+    const { data: existingConnArr } = await supabase
       .from("meta_connections")
       .select("id")
       .eq("user_id", userId)
-      .maybeSingle();
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    const existingConn = existingConnArr?.[0];
 
     let dbError = '';
 
@@ -208,11 +211,14 @@ Deno.serve(async (req: Request) => {
     }
 
     // 2. Save discovered options for selection (JSON data column)
-    const { data: existingSel } = await supabase
+    const { data: existingSelArr } = await supabase
       .from("meta_account_selections")
       .select("id")
       .eq("user_id", userId)
-      .maybeSingle();
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    const existingSel = existingSelArr?.[0];
 
     const selectionPayload = {
       selection_completed: false,

@@ -20,7 +20,7 @@ interface KPICard {
   icon: React.ReactNode;
 }
 
-export default function ProductionHomeView({ data, isLoading, onDataRefresh }: HomeViewProps) {
+export default function ProductionHomeView({ isMetaConnected, data, isLoading, onDataRefresh }: HomeViewProps) {
   const { theme } = useTheme();
   const { countryCode } = useAuth();
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
@@ -128,169 +128,183 @@ export default function ProductionHomeView({ data, isLoading, onDataRefresh }: H
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
-        {/* Sales Trend Chart - Left (2 cols) */}
-        <div
-          className={`lg:col-span-2 p-6 rounded-xl border ${theme === 'dark'
-            ? 'bg-gray-800 border-gray-700'
-            : 'bg-white border-gray-200'
-            } shadow-sm`}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-              Sales Trend
-            </h2>
-            {isLoading && (
-              <div className="w-4 h-4 rounded-full animate-spin border-2 border-blue-500 border-t-transparent"></div>
-            )}
+      {!isMetaConnected ? (
+        <div className="w-full p-12 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-2xl bg-gray-50 dark:bg-gray-800/50">
+          <div className="w-16 h-16 mb-4 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center">
+            <Zap className="w-8 h-8" />
           </div>
-          <div style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {isLoading ? (
-              <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                Loading chart...
-              </p>
-            ) : salesTrend.length > 0 ? (
-              <SalesTrendChart data={salesTrend} />
-            ) : (
-              <p className={`text-sm ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
-                No data yet
-              </p>
-            )}
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Connect Your Meta Account</h3>
+          <p className="text-gray-500 dark:text-gray-400 text-center max-w-md mb-6">
+            To view your active campaigns, latest sales trends, and detailed insights, please connect your Meta advertising account.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
+          {/* Sales Trend Chart - Left (2 cols) */}
+          <div
+            className={`lg:col-span-2 p-6 rounded-xl border ${theme === 'dark'
+              ? 'bg-gray-800 border-gray-700'
+              : 'bg-white border-gray-200'
+              } shadow-sm`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                Sales Trend
+              </h2>
+              {isLoading && (
+                <div className="w-4 h-4 rounded-full animate-spin border-2 border-blue-500 border-t-transparent"></div>
+              )}
+            </div>
+            <div style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {isLoading ? (
+                <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Loading chart...
+                </p>
+              ) : salesTrend.length > 0 ? (
+                <SalesTrendChart data={salesTrend} />
+              ) : (
+                <p className={`text-sm ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
+                  No data yet
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Top 5 Campaigns Summary - Right */}
+          <div
+            className={`p-6 rounded-xl border ${theme === 'dark'
+              ? 'bg-gray-800 border-gray-700'
+              : 'bg-white border-gray-200'
+              } shadow-sm flex flex-col`}
+          >
+            <h3 className={`text-lg font-semibold mb-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              Top 5 Campaigns
+            </h3>
+            <div className="space-y-3 flex-1 overflow-y-auto">
+              {campaigns.slice(0, 5).length > 0 ? (
+                campaigns.slice(0, 5).map((campaign) => (
+                  <button
+                    key={campaign.id}
+                    onClick={() => setSelectedCampaign(campaign)}
+                    className={`w-full text-left p-4 rounded-lg border transition-all group ${theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600 hover:bg-gray-600 hover:border-gray-500'
+                      : 'bg-gray-50 border-gray-200 hover:bg-white hover:border-blue-200 hover:shadow-md'
+                      }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0 pr-3">
+                        <p className={`text-sm font-semibold truncate ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                          }`}>
+                          {campaign.name || 'Unnamed Campaign'}
+                        </p>
+                        <div className="flex items-center gap-3 mt-1.5">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${theme === 'dark' ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'
+                            }`}>
+                            ROAS: {campaign.roas}x
+                          </span>
+                          <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                            ID: {campaign.id ? campaign.id.slice(-6) : '--'}
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronRight className={`w-4 h-4 transition-transform group-hover:translate-x-1 ${theme === 'dark' ? 'text-gray-500 group-hover:text-white' : 'text-gray-400 group-hover:text-blue-500'
+                        }`} />
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <p className={`text-sm text-center py-6 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'
+                  }`}>
+                  No top campaigns found
+                </p>
+              )}
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Top 5 Campaigns Summary - Right */}
+      {/* Recent Campaigns Card */}
+      {isMetaConnected && (
         <div
           className={`p-6 rounded-xl border ${theme === 'dark'
             ? 'bg-gray-800 border-gray-700'
             : 'bg-white border-gray-200'
-            } shadow-sm flex flex-col`}
+            } shadow-sm`}
         >
-          <h3 className={`text-lg font-semibold mb-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            Top 5 Campaigns
-          </h3>
-          <div className="space-y-3 flex-1 overflow-y-auto">
-            {campaigns.slice(0, 5).length > 0 ? (
-              campaigns.slice(0, 5).map((campaign) => (
-                <button
-                  key={campaign.id}
-                  onClick={() => setSelectedCampaign(campaign)}
-                  className={`w-full text-left p-4 rounded-lg border transition-all group ${theme === 'dark'
-                    ? 'bg-gray-700 border-gray-600 hover:bg-gray-600 hover:border-gray-500'
-                    : 'bg-gray-50 border-gray-200 hover:bg-white hover:border-blue-200 hover:shadow-md'
-                    }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0 pr-3">
-                      <p className={`text-sm font-semibold truncate ${theme === 'dark' ? 'text-white' : 'text-gray-900'
-                        }`}>
-                        {campaign.name || 'Unnamed Campaign'}
-                      </p>
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${theme === 'dark' ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'
+          <h2 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+            Recent Campaigns
+          </h2>
+          {recentCampaigns.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className={`border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <th className={`text-left py-3 px-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                      }`}>Name</th>
+                    <th className={`text-left py-3 px-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                      }`}>ID</th>
+                    <th className={`text-left py-3 px-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                      }`}>Status</th>
+                    <th className={`text-left py-3 px-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                      }`}>Result</th>
+                    <th className={`text-left py-3 px-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                      }`}>Start Date</th>
+                    <th className={`text-left py-3 px-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                      }`}>End Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentCampaigns.map((campaign) => {
+                    const profit = campaign.revenue && campaign.spend ? campaign.revenue - campaign.spend : 0;
+                    const isProfit = profit >= 0;
+
+                    return (
+                      <tr
+                        key={campaign.id}
+                        className={`border-b ${theme === 'dark'
+                          ? 'border-gray-700 hover:bg-gray-700/50'
+                          : 'border-gray-200 hover:bg-gray-50'
+                          }`}
+                      >
+                        <td className={`py-3 px-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>
+                          {campaign.name || '--'}
+                        </td>
+                        <td className={`py-3 px-4 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {campaign.id || '--'}
+                        </td>
+                        <td className={`py-3 px-4`}>
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${campaign.status === 'active' || campaign.status === 'ACTIVE'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : campaign.status === 'paused'
+                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                              : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
+                            }`}>
+                            {campaign.status || '--'}
+                          </span>
+                        </td>
+                        <td className={`py-3 px-4 text-sm font-semibold ${isProfit ? 'text-green-600' : 'text-red-600'
                           }`}>
-                          ROAS: {campaign.roas}x
-                        </span>
-                        <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                          ID: {campaign.id ? campaign.id.slice(-6) : '--'}
-                        </span>
-                      </div>
-                    </div>
-                    <ChevronRight className={`w-4 h-4 transition-transform group-hover:translate-x-1 ${theme === 'dark' ? 'text-gray-500 group-hover:text-white' : 'text-gray-400 group-hover:text-blue-500'
-                      }`} />
-                  </div>
-                </button>
-              ))
-            ) : (
-              <p className={`text-sm text-center py-6 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'
-                }`}>
-                No top campaigns found
-              </p>
-            )}
-          </div>
+                          {isProfit ? 'Profit' : 'Loss'}: {formatCurrency(Math.abs(profit), countryCode)}
+                        </td>
+                        <td className={`py-3 px-4 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {campaign.date_start ? new Date(campaign.date_start).toLocaleDateString() : '--'}
+                        </td>
+                        <td className={`py-3 px-4 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {campaign.date_stop ? new Date(campaign.date_stop).toLocaleDateString() : '--'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className={`text-center py-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
+              No campaigns yet
+            </p>
+          )}
         </div>
-      </div>
-
-      {/* Recent Campaigns Card */}
-      <div
-        className={`p-6 rounded-xl border ${theme === 'dark'
-          ? 'bg-gray-800 border-gray-700'
-          : 'bg-white border-gray-200'
-          } shadow-sm`}
-      >
-        <h2 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-          Recent Campaigns
-        </h2>
-        {recentCampaigns.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className={`border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
-                  <th className={`text-left py-3 px-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-                    }`}>Name</th>
-                  <th className={`text-left py-3 px-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-                    }`}>ID</th>
-                  <th className={`text-left py-3 px-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-                    }`}>Status</th>
-                  <th className={`text-left py-3 px-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-                    }`}>Result</th>
-                  <th className={`text-left py-3 px-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-                    }`}>Start Date</th>
-                  <th className={`text-left py-3 px-4 font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-                    }`}>End Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentCampaigns.map((campaign) => {
-                  const profit = campaign.revenue && campaign.spend ? campaign.revenue - campaign.spend : 0;
-                  const isProfit = profit >= 0;
-
-                  return (
-                    <tr
-                      key={campaign.id}
-                      className={`border-b ${theme === 'dark'
-                        ? 'border-gray-700 hover:bg-gray-700/50'
-                        : 'border-gray-200 hover:bg-gray-50'
-                        }`}
-                    >
-                      <td className={`py-3 px-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>
-                        {campaign.name || '--'}
-                      </td>
-                      <td className={`py-3 px-4 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {campaign.id || '--'}
-                      </td>
-                      <td className={`py-3 px-4`}>
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${campaign.status === 'active' || campaign.status === 'ACTIVE'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : campaign.status === 'paused'
-                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                            : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400'
-                          }`}>
-                          {campaign.status || '--'}
-                        </span>
-                      </td>
-                      <td className={`py-3 px-4 text-sm font-semibold ${isProfit ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                        {isProfit ? 'Profit' : 'Loss'}: {formatCurrency(Math.abs(profit), countryCode)}
-                      </td>
-                      <td className={`py-3 px-4 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {campaign.date_start ? new Date(campaign.date_start).toLocaleDateString() : '--'}
-                      </td>
-                      <td className={`py-3 px-4 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {campaign.date_stop ? new Date(campaign.date_stop).toLocaleDateString() : '--'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className={`text-center py-8 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>
-            No campaigns yet
-          </p>
-        )}
-      </div>
+      )}
 
       {selectedCampaign && (
         <CampaignDetailsModal

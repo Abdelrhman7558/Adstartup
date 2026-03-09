@@ -48,22 +48,25 @@ Deno.serve(async (req: Request) => {
       } catch { /* no body */ }
     }
 
-    const { data: metaConnection, error: metaError } = await supabase
+    const { data: metaConnections, error: metaError } = await supabase
       .from('meta_connections')
       .select('access_token, ad_account_id')
       .eq('user_id', user.id)
-      .maybeSingle();
+      .order('updated_at', { ascending: false })
+      .limit(1);
 
+    const metaConnection = metaConnections?.[0];
     let accessToken = metaConnection?.access_token;
 
     // Fallback: check meta_account_selections (token stored after OAuth)
     if (!accessToken) {
-      const { data: metaSelection } = await supabase
+      const { data: metaSelections } = await supabase
         .from('meta_account_selections')
         .select('access_token')
         .eq('user_id', user.id)
-        .maybeSingle();
-      accessToken = metaSelection?.access_token;
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      accessToken = metaSelections?.[0]?.access_token;
     }
 
     if (!accessToken) {
@@ -79,11 +82,14 @@ Deno.serve(async (req: Request) => {
     }
 
     // Fetch pixels from the 'meta_connections' table where the user's choices are stored
-    const { data: connectionData, error: connectionError } = await supabase
+    const { data: connectionDataArr, error: connectionError } = await supabase
       .from('meta_connections')
       .select('pixel_id, pixel_name')
       .eq('ad_account_id', adAccountId?.replace('act_', '') || '')
-      .maybeSingle();
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    const connectionData = connectionDataArr?.[0];
 
     if (connectionError) {
       console.error('[get-pixels] Error querying meta_connections table:', connectionError);
@@ -101,11 +107,13 @@ Deno.serve(async (req: Request) => {
 
     // fallback check meta_account_selections if not in meta_connections
     if (pixelsArray.length === 0) {
-      const { data: selectionData } = await supabase
+      const { data: selectionDataArr } = await supabase
         .from('meta_account_selections')
         .select('pixel_id, pixel_name')
         .eq('user_id', user.id)
-        .maybeSingle();
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      const selectionData = selectionDataArr?.[0];
 
       if (selectionData?.pixel_id) {
         pixelsArray = [{
@@ -118,11 +126,12 @@ Deno.serve(async (req: Request) => {
 
     // fallback check 'Accounts' table (Legacy/n8n source)
     if (pixelsArray.length === 0) {
-      const { data: accountData } = await supabase
+      const { data: accountDataArr } = await supabase
         .from('Accounts')
         .select('Pixels')
         .eq('User ID', user.id)
-        .maybeSingle();
+        .limit(1);
+      const accountData = accountDataArr?.[0];
 
       if (accountData?.Pixels) {
         console.log(`[get-pixels] Found Pixels in Accounts table for user: ${user.id}`);
@@ -180,7 +189,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({ data: pixelsArray }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in get-pixels:', error);
     return new Response(
       JSON.stringify({ error: error.message || 'Internal server error' }),

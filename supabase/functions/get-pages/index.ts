@@ -38,22 +38,25 @@ Deno.serve(async (req: Request) => {
     }
 
     // Try meta_connections first
-    const { data: metaConnection, error: metaError } = await supabase
+    const { data: metaConnections, error: metaError } = await supabase
       .from('meta_connections')
       .select('access_token, ad_account_id')
       .eq('user_id', user.id)
-      .maybeSingle();
+      .order('updated_at', { ascending: false })
+      .limit(1);
 
+    const metaConnection = metaConnections?.[0];
     let accessToken = metaConnection?.access_token;
 
     // Fallback: check meta_account_selections (token stored after OAuth)
     if (!accessToken) {
-      const { data: metaSelection } = await supabase
+      const { data: metaSelections } = await supabase
         .from('meta_account_selections')
         .select('access_token')
         .eq('user_id', user.id)
-        .maybeSingle();
-      accessToken = metaSelection?.access_token;
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      accessToken = metaSelections?.[0]?.access_token;
     }
 
     if (!accessToken) {
@@ -107,10 +110,10 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ data: pages }),
+      JSON.stringify({ data: allPages }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in get-pages:', error);
     return new Response(
       JSON.stringify({ error: error.message || 'Internal server error' }),
