@@ -29,20 +29,20 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
     };
 
     const navItems = [
-        { name: 'Overview', path: '/client-dashboard/overview', icon: LayoutDashboard },
-        { name: 'Integration', path: '/client-dashboard/integration', icon: LinkIcon },
-        { name: 'Campaign', path: '/client-dashboard/campaigns', icon: Megaphone, badge: badges.campaigns },
+        { name: 'Overview', path: '/dashboard/overview', icon: LayoutDashboard },
+        { name: 'Integration', path: '/dashboard/integration', icon: LinkIcon },
+        { name: 'Campaign', path: '/dashboard/campaigns', icon: Megaphone, badge: badges.campaigns },
     ];
 
     const analyticsItems = [
-        { name: 'Overall', path: '/client-dashboard/analytics', icon: BarChart3 },
-        { name: 'Sent', path: '/client-dashboard/analytics/sent' },
-        { name: 'Campaigns', path: '/client-dashboard/analytics/campaigns' },
+        { name: 'Overall', path: '/dashboard/analytics', icon: BarChart3 },
+        { name: 'Sent', path: '/dashboard/analytics/sent' },
+        { name: 'Campaigns', path: '/dashboard/analytics/campaigns' },
     ];
 
     const bottomItems = [
-        { name: 'Billing', path: '/client-dashboard/billing', icon: CreditCard, badge: badges.billing },
-        { name: 'Business Settings', path: '/client-dashboard/settings', icon: Settings },
+        { name: 'Billing', path: '/dashboard/billing', icon: CreditCard, badge: badges.billing },
+        { name: 'Business Settings', path: '/dashboard/settings', icon: Settings },
     ];
 
     const secondaryNavItems = [
@@ -125,7 +125,7 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
                     {/* Analytics Dropdown Simulation */}
                     <div className="mt-2">
                         <NavLink
-                            to="/client-dashboard/analytics"
+                            to="/dashboard/analytics"
                             className={({ isActive }) => cn(
                                 "flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer",
                                 isActive

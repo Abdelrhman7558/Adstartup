@@ -66,7 +66,7 @@ function AppContent() {
         }
       />
       <Route
-        path="/dashboard"
+        path="/dashboard-legacy"
         element={
           <SubscriptionProtectedRoute>
             <ProductionDashboard />
@@ -82,7 +82,7 @@ function AppContent() {
         }
       />
       <Route
-        path="/client-dashboard/*"
+        path="/dashboard/*"
         element={
           <SubscriptionProtectedRoute>
             <ClientDashboard />
