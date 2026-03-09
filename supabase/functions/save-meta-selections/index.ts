@@ -165,10 +165,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 2. Update the RECONSTRUCTED meta_connections table with permanent choices
     const metaConnectionData = {
       user_id: targetUserId,
       ad_account_id: payload.ad_account_id,
+      ad_account_name: payload.ad_account_name || null,
       pixel_id: payload.pixel_id || null,
       page_id: payload.page_id || null,
       page_name: payload.page_name || null,
@@ -184,6 +184,10 @@ Deno.serve(async (req: Request) => {
 
     if (connectionError) {
       console.error('Error saving to meta_connections:', connectionError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to save to meta_connections: ' + connectionError.message, details: connectionError }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (connectionError) {

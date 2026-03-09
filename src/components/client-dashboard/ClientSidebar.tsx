@@ -11,7 +11,6 @@ import {
     Activity,
     Users
 } from 'lucide-react';
-import { NotificationBadge } from '../ui/NotificationBadge';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -23,16 +22,10 @@ interface SidebarProps {
 export function ClientSidebar({ isOpen }: SidebarProps) {
     const { profile, user } = useAuth();
 
-    // Example hardcoded badge counts matching the image
-    const badges = {
-        campaigns: 32,
-        billing: 2,
-    };
-
     const navItems = [
         { name: 'Overview', path: '/dashboard/overview', icon: LayoutDashboard },
         { name: 'Integration', path: '/dashboard/integration', icon: LinkIcon },
-        { name: 'Campaign', path: '/dashboard/campaigns', icon: Megaphone, badge: badges.campaigns },
+        { name: 'Campaign', path: '/dashboard/campaigns', icon: Megaphone },
     ];
 
     const analyticsItems = [
@@ -42,7 +35,7 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
     ];
 
     const bottomItems = [
-        { name: 'Billing', path: '/dashboard/billing', icon: CreditCard, badge: badges.billing },
+        { name: 'Billing', path: '/dashboard/billing', icon: CreditCard },
         { name: 'Business Settings', path: '/dashboard/settings', icon: Settings },
     ];
 
@@ -56,12 +49,12 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
     return (
         <aside
             className={cn(
-                "fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-100 flex flex-col transition-transform duration-300 ease-in-out",
+                "fixed lg:static inset-y-0 left-0 z-40 w-[260px] bg-white border-r border-gray-100 flex flex-col transition-transform duration-300 ease-in-out",
                 !isOpen && "-translate-x-full lg:translate-x-0 lg:w-0 lg:overflow-hidden",
                 isOpen && "translate-x-0"
             )}
         >
-            <div className="flex flex-col h-full w-64 px-4 py-6 overflow-y-auto">
+            <div className="flex flex-col h-full w-[260px] px-4 py-6 overflow-y-auto">
                 {/* Logo */}
                 <div className="flex items-center gap-2 px-2 mb-8 mt-2">
                     <img src="/logo-new.png" alt="The Ad Agent Logo" className="w-10 h-10 object-contain" />
@@ -113,9 +106,6 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
                                 <item.icon className="w-5 h-5 opacity-80" />
                                 {item.name}
                             </div>
-                            {item.badge && (
-                                <NotificationBadge count={item.badge} />
-                            )}
                         </NavLink>
                     ))}
 
@@ -171,9 +161,6 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
                                 <item.icon className="w-5 h-5 opacity-80" />
                                 {item.name}
                             </div>
-                            {item.badge && (
-                                <NotificationBadge count={item.badge} className="bg-red-500" />
-                            )}
                         </NavLink>
                     ))}
                 </nav>

@@ -1,5 +1,4 @@
 import { Search, Bell, Share2, Menu } from 'lucide-react';
-import { NotificationBadge } from '../ui/NotificationBadge';
 
 interface ClientHeaderProps {
     onMenuClick: () => void;
@@ -51,10 +50,8 @@ export function ClientHeader({ onMenuClick }: ClientHeaderProps) {
                         <Share2 className="w-4 h-4 text-gray-500" />
                     </button>
 
-                    {/* Notification Bell */}
                     <button className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors">
                         <Bell className="w-5 h-5" />
-                        <NotificationBadge count={2} className="absolute top-1 right-1" />
                     </button>
                 </div>
             </div>
