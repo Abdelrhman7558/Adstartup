@@ -14,7 +14,18 @@ export default function MetaCallback() {
 
   const handleCallback = async () => {
     try {
-      // 1. CHECK FOR SUCCESS FROM EDGE FUNCTION
+      // 1. CHECK FOR DATABASE ERRORS PASSED FROM EDGE FUNCTION
+      const dbErrors = ['conn_upd', 'conn_ins', 'sel_upd', 'sel_ins']
+        .map(key => searchParams.get(key) ? `${key}: ${searchParams.get(key)}` : null)
+        .filter(Boolean);
+
+      if (dbErrors.length > 0) {
+        setErrorMsg(`Database insertion failed during Meta connection! Please show this error to the developer:\n\n${dbErrors.join('\n')}`);
+        setStatus('error');
+        return;
+      }
+
+      // 2. CHECK FOR SUCCESS FROM EDGE FUNCTION
       if (searchParams.get('meta_connected') === 'true') {
         setStatus('success');
         const userId = searchParams.get('user_id') || user?.id;
@@ -25,7 +36,7 @@ export default function MetaCallback() {
         return;
       }
 
-      // 2. CHECK FOR ERRORS
+      // 3. CHECK FOR ERRORS
       const errorParam = searchParams.get('error');
       if (errorParam) {
         if (errorParam === 'access_denied') {

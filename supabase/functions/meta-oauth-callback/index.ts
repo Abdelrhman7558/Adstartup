@@ -181,13 +181,18 @@ Deno.serve(async (req: Request) => {
       .eq("user_id", userId)
       .maybeSingle();
 
+    let dbError = '';
+
     if (existingConn) {
       const { error: updateErr } = await supabase.from("meta_connections").update({
         access_token: longToken,
         is_connected: true,
         updated_at: new Date().toISOString()
       }).eq("user_id", userId);
-      if (updateErr) console.error("[OAuth] Error updating meta_connections:", updateErr);
+      if (updateErr) {
+        console.error("[OAuth] Error updating meta_connections:", updateErr);
+        dbError += `conn_upd=${encodeURIComponent(updateErr.message)}&`;
+      }
     } else {
       const { error: insertErr } = await supabase.from("meta_connections").insert({
         user_id: userId,
@@ -196,7 +201,10 @@ Deno.serve(async (req: Request) => {
         connected_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       });
-      if (insertErr) console.error("[OAuth] Error inserting meta_connections:", insertErr);
+      if (insertErr) {
+        console.error("[OAuth] Error inserting meta_connections:", insertErr);
+        dbError += `conn_ins=${encodeURIComponent(insertErr.message)}&`;
+      }
     }
 
     // 2. Save discovered options for selection (JSON data column)
@@ -219,19 +227,25 @@ Deno.serve(async (req: Request) => {
 
     if (existingSel) {
       const { error: selUpdateErr } = await supabase.from("meta_account_selections").update(selectionPayload).eq("user_id", userId);
-      if (selUpdateErr) console.error("[OAuth] Error updating meta_account_selections:", selUpdateErr);
+      if (selUpdateErr) {
+        console.error("[OAuth] Error updating meta_account_selections:", selUpdateErr);
+        dbError += `sel_upd=${encodeURIComponent(selUpdateErr.message)}&`;
+      }
     } else {
       const { error: selInsertErr } = await supabase.from("meta_account_selections").insert({
         user_id: userId,
         ...selectionPayload
       });
-      if (selInsertErr) console.error("[OAuth] Error inserting meta_account_selections:", selInsertErr);
+      if (selInsertErr) {
+        console.error("[OAuth] Error inserting meta_account_selections:", selInsertErr);
+        dbError += `sel_ins=${encodeURIComponent(selInsertErr.message)}&`;
+      }
     }
 
     console.log(`[OAuth] Discovery complete. Found ${results.ad_accounts.length} accounts, ${results.pixels.length} pixels, ${results.catalogs.length} catalogs.`);
 
     // ─── Final Redirect ──────────────────────────────────────────────
-    let finalRedirect = `${redirectBase}?meta_connected=true&user_id=${userId}`;
+    let finalRedirect = `${redirectBase}?meta_connected=true&user_id=${userId}&${dbError}`;
     if (decodedState.isManagerOption) {
       finalRedirect += '&mode=manager';
     }
