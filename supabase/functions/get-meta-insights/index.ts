@@ -1,0 +1,161 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+
+const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+interface InsightsRequest {
+    userId: string;
+}
+
+Deno.serve(async (req) => {
+    if (req.method === "OPTIONS") {
+        return new Response("ok", { headers: corsHeaders });
+    }
+
+    try {
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader) {
+            throw new Error("Missing authorization header");
+        }
+
+        const { userId } = await req.json() as InsightsRequest;
+        if (!userId) {
+            throw new Error("Missing userId");
+        }
+
+        // Initialize Supabase Client
+        const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        // 1. Get Meta Connection Details for User
+        const { data: connection, error: connError } = await supabase
+            .from('meta_connections')
+            .select('access_token, ad_account_id')
+            .eq('user_id', userId)
+            .single();
+
+        if (connError || !connection || !connection.access_token || !connection.ad_account_id) {
+            console.error("[get-meta-insights] User Meta connection missing:", connError?.message);
+            return new Response(JSON.stringify({
+                insights: {
+                    summary_cards: [],
+                    activity_grid: [],
+                    campaign_performance: [],
+                    weekly_trend: []
+                }
+            }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200, // Return 200 with empty to not crash frontend
+            });
+        }
+
+        const accessToken = connection.access_token;
+        const adAccountId = connection.ad_account_id;
+
+        // 2. Fetch Data from Meta Graph API
+        const url = `https://graph.facebook.com/v19.0/${adAccountId}/insights?fields=campaign_id,campaign_name,impressions,clicks,spend,ctr,cpm,cpc,reach,frequency,action_values,purchase_roas,date_start&level=campaign&limit=100&date_preset=last_30d&access_token=${accessToken}`;
+
+        console.log("[get-meta-insights] Fetching from Meta...");
+        const metaRes = await fetch(url);
+        const metaData = await metaRes.json();
+
+        if (!metaRes.ok) {
+            throw new Error(metaData.error?.message || "Failed to fetch from Meta Graph API");
+        }
+
+        const data = metaData.data || [];
+
+        // 3. Transform Data EXACTLY like the n8n Insights Javascript Node did
+        let totalRevenue = 0;
+        let totalSpend = 0;
+        let totalClicks = 0;
+        let totalImpressions = 0;
+
+        data.forEach((item: any) => {
+            const spend = parseFloat(item.spend || 0);
+            const clicks = parseInt(item.clicks || 0);
+            const impressions = parseInt(item.impressions || 0);
+
+            totalSpend += spend;
+            totalClicks += clicks;
+            totalImpressions += impressions;
+
+            // Extract purchase action values
+            if (item.action_values && Array.isArray(item.action_values)) {
+                item.action_values.forEach((av: any) => {
+                    if (av.action_type === 'purchase') {
+                        totalRevenue += parseFloat(av.value || 0);
+                    }
+                });
+            }
+        });
+
+        // Fallback logic from n8n script
+        if (totalRevenue === 0) totalRevenue = totalSpend;
+
+        const roi = totalSpend > 0 ? ((totalRevenue - totalSpend) / totalSpend * 100) : 0;
+        const conversionRate = totalImpressions > 0 ? (totalClicks / totalImpressions * 100) : 0;
+
+        // --- summary_cards ---
+        const summary_cards = [
+            { label: "Total Revenue", value: `$${totalRevenue.toFixed(2)}`, trend: "auto", trend_direction: "up" },
+            { label: "Total Spend", value: `$${totalSpend.toFixed(2)}`, trend: "auto", trend_direction: "down" },
+            { label: "ROI", value: `${roi.toFixed(2)}%`, trend: "auto", trend_direction: roi >= 0 ? "up" : "down" },
+            { label: "Conversion Rate", value: `${conversionRate.toFixed(2)}%`, trend: "auto", trend_direction: "up" }
+        ];
+
+        // --- activity_grid ---
+        const activity_grid = data.map((item: any) => ({
+            date: item.date_start,
+            count: parseInt(item.clicks || 0)
+        }));
+
+        // --- campaign_performance ---
+        const campaignActionMap: any[] = [];
+        data.forEach((item: any, index: number) => {
+            const roasVal = item.purchase_roas && item.purchase_roas[0] ? item.purchase_roas[0].value : null;
+
+            campaignActionMap.push({
+                id: (index + 1).toString(),
+                name: item.campaign_name || item.campaign?.name || `Campaign ${index + 1}`,
+                progress: totalSpend > 0 ? Math.min(Math.round((parseFloat(item.spend || 0) / totalSpend) * 100), 100) : 0,
+                metric: "ROAS",
+                value: roasVal ? parseFloat(roasVal).toFixed(2) : "N/A",
+                color: "#FF5733"
+            });
+        });
+        // Sort logic from original or just map it directly
+        const campaign_performance = campaignActionMap;
+
+        // --- weekly_trend ---
+        const weekly_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        const weekly_trend = weekly_days.map((day, index) => ({
+            day: day,
+            value: activity_grid[index] ? activity_grid[index].count : 0
+        }));
+
+        // Construct final matching payload
+        return new Response(JSON.stringify({
+            insights: {
+                summary_cards,
+                activity_grid,
+                campaign_performance,
+                weekly_trend
+            }
+        }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+        });
+    } catch (error: any) {
+        console.error("[get-meta-insights] Edge Function Error:", error);
+        return new Response(JSON.stringify({ error: error.message }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+        });
+    }
+});

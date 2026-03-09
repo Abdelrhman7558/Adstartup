@@ -1,31 +1,31 @@
 import type { DashboardData } from './dataTransformer';
 import { DEFAULT_DASHBOARD_DATA, transformDashboardData } from './dataTransformer';
+import { supabase } from './supabase';
 
 const MAIN_DATA_URL = 'https://n8n.srv1181726.hstgr.cloud/webhook/other-data';
-const RECENT_CAMPAIGNS_URL = 'https://n8n.srv1181726.hstgr.cloud/webhook/Recently-campaign';
 const SALES_TREND_URL = 'https://n8n.srv1181726.hstgr.cloud/webhook/sales-trend';
-const ALL_ADS_URL = 'https://n8n.srv1181726.hstgr.cloud/webhook/all-ads';
-const ACTIVE_CAMPAIGNS_URL = 'https://n8n.srv1181726.hstgr.cloud/webhook/active-campaigns';
-const TOP_5_CAMPAIGNS_URL = 'https://n8n.srv1181726.hstgr.cloud/webhook/top-5-campaigns';
-const INSIGHTS_URL = 'https://n8n.srv1181726.hstgr.cloud/webhook/Insights';
 
-// ... other constants ...
+// Replaced by get-meta-campaigns
+// const RECENT_CAMPAIGNS_URL = 'https://n8n.srv1181726.hstgr.cloud/webhook/Recently-campaign';
+// const ALL_ADS_URL = 'https://n8n.srv1181726.hstgr.cloud/webhook/all-ads';
+// const ACTIVE_CAMPAIGNS_URL = 'https://n8n.srv1181726.hstgr.cloud/webhook/active-campaigns';
+// const TOP_5_CAMPAIGNS_URL = 'https://n8n.srv1181726.hstgr.cloud/webhook/top-5-campaigns';
+
+// Replaced by get-meta-insights
+// const INSIGHTS_URL = 'https://n8n.srv1181726.hstgr.cloud/webhook/Insights';
 
 export async function fetchActiveCampaigns(userId: string): Promise<any[]> {
   if (!userId) return [];
 
   try {
-    const res = await fetch(ACTIVE_CAMPAIGNS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId }),
+    const { data: json, error } = await supabase.functions.invoke('get-meta-campaigns', {
+      body: { userId }
     });
 
-    if (!res.ok) throw new Error('Failed to fetch active campaigns');
+    if (error) throw error;
 
-    const json = await res.json();
     console.log('[Dashboard] Active Campaigns received:', json);
-    return json.active_campaigns || json || [];
+    return json?.active_campaigns || [];
   } catch (err) {
     console.error('Error fetching active campaigns:', err);
     return [];
@@ -41,8 +41,8 @@ export async function fetchDashboardData(userId: string): Promise<DashboardData>
   try {
     console.log('[Dashboard] Starting parallel webhook requests...', { userId });
 
-    // Helper to fetch from a URL with error handling (returns empty object on failure)
-    const fetchSafe = async (url: string, label: string) => {
+    // Fetch legacy or static API data that wasn't replaced yet
+    const fetchSafeLegacy = async (url: string, label: string) => {
       try {
         const res = await fetch(url, {
           method: 'POST',
@@ -59,20 +59,28 @@ export async function fetchDashboardData(userId: string): Promise<DashboardData>
       }
     };
 
-    // Parallel execution
-    const [mainData, recentData, trendData, top5Data, insightsData] = await Promise.all([
-      fetchSafe(MAIN_DATA_URL, 'Main Data'),
-      fetchSafe(RECENT_CAMPAIGNS_URL, 'Recent Campaigns'),
-      fetchSafe(SALES_TREND_URL, 'Sales Trend'),
-      fetchSafe(TOP_5_CAMPAIGNS_URL, 'Top 5 Campaigns'),
-      fetchSafe(INSIGHTS_URL, 'Insights'),
+    // Parallel execution for new Edge Functions and legacy webhooks
+    const [
+      mainData,
+      trendData,
+      { data: metaCampaigns, error: campaignsError },
+      { data: metaInsights, error: insightsError }
+    ] = await Promise.all([
+      fetchSafeLegacy(MAIN_DATA_URL, 'Main Data'),
+      fetchSafeLegacy(SALES_TREND_URL, 'Sales Trend'),
+      supabase.functions.invoke('get-meta-campaigns', { body: { userId } }),
+      supabase.functions.invoke('get-meta-insights', { body: { userId } })
     ]);
+
+    if (campaignsError) console.error('[Dashboard] get-meta-campaigns failed:', campaignsError);
+    if (insightsError) console.error('[Dashboard] get-meta-insights failed:', insightsError);
+
 
     // Merge data:
     // ... (logic for recent and trend)
 
     // Recent Campaigns Extraction
-    let rawRecent = recentData.recent_campaigns || recentData;
+    let rawRecent = metaCampaigns?.recent_campaigns || [];
     if (!Array.isArray(rawRecent)) rawRecent = [];
 
     // Sales Trend Extraction
@@ -80,11 +88,11 @@ export async function fetchDashboardData(userId: string): Promise<DashboardData>
     if (!Array.isArray(rawTrend)) rawTrend = [];
 
     // Top 5 Extraction
-    let rawTop5 = top5Data.top_5_campaigns || top5Data;
+    let rawTop5 = metaCampaigns?.top_5_campaigns || [];
     if (!Array.isArray(rawTop5)) rawTop5 = [];
 
     // Insights Extraction
-    let rawInsights = insightsData.insights || insightsData || {};
+    let rawInsights = metaInsights?.insights || metaInsights || {};
 
     const combinedData = {
       ...mainData,

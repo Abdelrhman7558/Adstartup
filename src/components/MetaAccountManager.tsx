@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle2, Loader, Link2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { buildMetaOAuthUrl, checkMetaConnectionStatus, N8N_WEBHOOKS } from '../lib/oauthState';
+import { supabase } from '../lib/supabase';
+import { buildMetaOAuthUrl, checkMetaConnectionStatus } from '../lib/oauthState';
 
 interface MetaAccountManagerProps {
   className?: string;
@@ -62,18 +63,12 @@ export default function MetaAccountManager({ className = '' }: MetaAccountManage
       setDisconnecting(true);
       setError(null);
 
-      const response = await fetch(N8N_WEBHOOKS.checkConnection, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          action: 'disconnect',
-          timestamp: new Date().toISOString(),
-        }),
+      const { error: invokeError } = await supabase.functions.invoke('disconnect-meta', {
+        body: { userId: user.id }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to disconnect Meta account');
+      if (invokeError) {
+        throw invokeError;
       }
 
       setIsConnected(false);

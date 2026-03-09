@@ -165,7 +165,8 @@ async function fetchCatalogProducts(limit = 5) {
 /**
  * 1. CATALOG -- Single Image (DPA)
  */
-function buildCatalogSingleImage() {
+function buildCatalogSingleImage(products) {
+    const productUrl = products[0]?.url || 'https://www.facebook.com/';
     return {
         label: '[CATALOG] Single Image (DPA)',
         creative: {
@@ -175,7 +176,7 @@ function buildCatalogSingleImage() {
                 page_id: CONFIG.page_id,
                 template_data: {
                     message: '{{product.name}} -- Discover the offer now!',
-                    link: '{{product.url}}',
+                    link: productUrl,
                     call_to_action: { type: 'SHOP_NOW' },
                     force_single_link: true,
                 },
@@ -187,7 +188,8 @@ function buildCatalogSingleImage() {
 /**
  * 2. CATALOG -- Carousel (DPA)
  */
-function buildCatalogCarousel() {
+function buildCatalogCarousel(products) {
+    const productUrl = products[0]?.url || 'https://www.facebook.com/';
     return {
         label: '[CATALOG] Carousel (DPA)',
         creative: {
@@ -197,7 +199,7 @@ function buildCatalogCarousel() {
                 page_id: CONFIG.page_id,
                 template_data: {
                     message: 'Shop the latest products -- Swipe to see more',
-                    link: '{{product.url}}',
+                    link: productUrl,
                     call_to_action: { type: 'SHOP_NOW' },
                     multi_share_end_card: true,
                 },
@@ -264,30 +266,25 @@ function buildAssetCarousel(products) {
 }
 
 /**
- * 5. CATALOG -- Collection (DPA)
+ * 5. CATALOG -- Carousel with Showcase (DPA)
+ *    Similar to catalog carousel but with different messaging approach
  */
-function buildCatalogCollection(products) {
-    const retailerIds = products.filter(p => p.retailer_id).map(p => p.retailer_id).slice(0, 4);
-
-    const templateData = {
-        message: 'Shop our exclusive collection',
-        link: '{{product.url}}',
-        call_to_action: { type: 'SHOP_NOW' },
-        force_single_link: false,
-    };
-
-    if (retailerIds.length > 0) {
-        templateData.retailer_item_ids = retailerIds;
-    }
+function buildCatalogShowcase(products) {
+    const productUrl = products[0]?.url || 'https://www.facebook.com/';
 
     return {
-        label: '[CATALOG] Collection (DPA)',
+        label: '[CATALOG] Showcase (DPA)',
         creative: {
-            name: `Catalog Collection DPA -- ${TIMESTAMP}`,
+            name: `Catalog Showcase DPA -- ${TIMESTAMP}`,
             product_set_id: CONFIG.product_set_id,
             object_story_spec: {
                 page_id: CONFIG.page_id,
-                template_data: templateData,
+                template_data: {
+                    message: '{{product.name}} | {{product.price}} -- Limited time offer!',
+                    link: productUrl,
+                    call_to_action: { type: 'SHOP_NOW' },
+                    multi_share_end_card: false,
+                },
             },
         },
     };
@@ -314,17 +311,62 @@ async function main() {
     section('Building Creative Specifications');
 
     const specs = [
-        buildCatalogSingleImage(),
-        buildCatalogCarousel(),
+        buildCatalogSingleImage(products),
+        buildCatalogCarousel(products),
         buildAssetSingleImage(products),
         buildAssetCarousel(products),
-        buildCatalogCollection(products),
+        buildCatalogShowcase(products),
     ].filter(Boolean);
 
     log('#', `Prepared ${C.bold}${specs.length}${C.reset} creative specs`);
 
     // Step 3: Create Creatives + Ads
+    // Note: if no IG actor found, catalog DPA ads may fail in the given adset
+    // due to Instagram placement requirements. We'll try the provided adset first,
+    // and if it fails we'll create a Facebook-only adset as fallback.
     const results = [];
+    let fbOnlyAdsetId = null;
+
+    async function getOrCreateFbOnlyAdset() {
+        if (fbOnlyAdsetId) return fbOnlyAdsetId;
+        log('#', `${C.yellow}Creating Facebook-only Adset as fallback...${C.reset}`);
+
+        // First, get the campaign_id from the existing adset
+        const adsetInfo = await metaGet(`/${CONFIG.adset_id}`, { fields: 'campaign_id,daily_budget,optimization_goal,billing_event,promoted_object,targeting,bid_strategy' });
+        if (!adsetInfo.ok) {
+            log('[X]', `${C.red}Cannot fetch adset info: ${adsetInfo.error}${C.reset}`);
+            return null;
+        }
+
+        const adsetData = adsetInfo.data;
+        const fbTargeting = { ...(adsetData.targeting || {}), publisher_platforms: ['facebook'] };
+        delete fbTargeting.facebook_positions; // let Meta auto-select
+        delete fbTargeting.instagram_positions;
+
+        const startTime = new Date(Date.now() + 5 * 60000).toISOString();
+
+        const fbAdsetResult = await metaPost(`/${CONFIG.ad_account_id}/adsets`, {
+            name: `FB Only Adset -- ${TIMESTAMP}`,
+            campaign_id: adsetData.campaign_id,
+            billing_event: adsetData.billing_event || 'IMPRESSIONS',
+            optimization_goal: adsetData.optimization_goal || 'OFFSITE_CONVERSIONS',
+            bid_strategy: adsetData.bid_strategy || 'LOWEST_COST_WITHOUT_CAP',
+            daily_budget: adsetData.daily_budget || 50000,
+            start_time: startTime,
+            status: 'PAUSED',
+            targeting: fbTargeting,
+            promoted_object: adsetData.promoted_object,
+        });
+
+        if (fbAdsetResult.ok) {
+            fbOnlyAdsetId = fbAdsetResult.data.id;
+            log('[OK]', `${C.green}Facebook-only Adset created: ${fbOnlyAdsetId}${C.reset}`);
+            return fbOnlyAdsetId;
+        } else {
+            log('[X]', `${C.red}Failed to create FB-only Adset: ${fbAdsetResult.error}${C.reset}`);
+            return null;
+        }
+    }
 
     for (let i = 0; i < specs.length; i++) {
         const spec = specs[i];
@@ -360,13 +402,27 @@ async function main() {
         const creativeId = creativeResult.data.id;
         log('[OK]', `${C.green}Creative created: ${C.bold}${creativeId}${C.reset}`);
 
-        // Create the Ad under the existing Ad Set
-        const adResult = await metaPost(`/${CONFIG.ad_account_id}/ads`, {
+        // Create the Ad under the existing Ad Set first
+        let adResult = await metaPost(`/${CONFIG.ad_account_id}/ads`, {
             name: `${creativeParams.name} -- Ad`,
             adset_id: CONFIG.adset_id,
             status: 'PAUSED',
             creative: { creative_id: creativeId },
         });
+
+        // If it fails due to Instagram and we have no IG actor, try FB-only adset
+        if (!adResult.ok && !resolvedIgId && adResult.error.toLowerCase().includes('instagram')) {
+            log('[!]', `${C.yellow}Instagram placement issue, trying FB-only adset...${C.reset}`);
+            const fallbackAdsetId = await getOrCreateFbOnlyAdset();
+            if (fallbackAdsetId) {
+                adResult = await metaPost(`/${CONFIG.ad_account_id}/ads`, {
+                    name: `${creativeParams.name} -- Ad (FB)`,
+                    adset_id: fallbackAdsetId,
+                    status: 'PAUSED',
+                    creative: { creative_id: creativeId },
+                });
+            }
+        }
 
         if (!adResult.ok) {
             log('[X]', `${C.red}Ad failed: ${adResult.error}${C.reset}`);
