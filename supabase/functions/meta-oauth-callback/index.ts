@@ -175,18 +175,38 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // 1. Save connection & long token
-    await supabase.from("meta_connections").upsert({
-      user_id: userId,
-      access_token: longToken,
-      is_connected: true,
-      connected_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id' });
+    const { data: existingConn } = await supabase
+      .from("meta_connections")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (existingConn) {
+      const { error: updateErr } = await supabase.from("meta_connections").update({
+        access_token: longToken,
+        is_connected: true,
+        updated_at: new Date().toISOString()
+      }).eq("user_id", userId);
+      if (updateErr) console.error("[OAuth] Error updating meta_connections:", updateErr);
+    } else {
+      const { error: insertErr } = await supabase.from("meta_connections").insert({
+        user_id: userId,
+        access_token: longToken,
+        is_connected: true,
+        connected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+      if (insertErr) console.error("[OAuth] Error inserting meta_connections:", insertErr);
+    }
 
     // 2. Save discovered options for selection (JSON data column)
-    // We store the lists in meta_account_selections as preliminary data
-    await supabase.from("meta_account_selections").upsert({
-      user_id: userId,
+    const { data: existingSel } = await supabase
+      .from("meta_account_selections")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const selectionPayload = {
       selection_completed: false,
       webhook_response: {
         discovered_at: new Date().toISOString(),
@@ -195,7 +215,18 @@ Deno.serve(async (req: Request) => {
         catalogs: results.catalogs
       },
       updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id' });
+    };
+
+    if (existingSel) {
+      const { error: selUpdateErr } = await supabase.from("meta_account_selections").update(selectionPayload).eq("user_id", userId);
+      if (selUpdateErr) console.error("[OAuth] Error updating meta_account_selections:", selUpdateErr);
+    } else {
+      const { error: selInsertErr } = await supabase.from("meta_account_selections").insert({
+        user_id: userId,
+        ...selectionPayload
+      });
+      if (selInsertErr) console.error("[OAuth] Error inserting meta_account_selections:", selInsertErr);
+    }
 
     console.log(`[OAuth] Discovery complete. Found ${results.ad_accounts.length} accounts, ${results.pixels.length} pixels, ${results.catalogs.length} catalogs.`);
 
