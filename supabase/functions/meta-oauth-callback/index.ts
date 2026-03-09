@@ -184,26 +184,26 @@ Deno.serve(async (req: Request) => {
     let dbError = '';
 
     if (existingConn) {
-      const { error: updateErr } = await supabase.from("meta_connections").update({
+      const updateResult = await supabase.from("meta_connections").update({
         access_token: longToken,
         is_connected: true,
         updated_at: new Date().toISOString()
       }).eq("user_id", userId);
-      if (updateErr) {
-        console.error("[OAuth] Error updating meta_connections:", updateErr);
-        dbError += `conn_upd=${encodeURIComponent(updateErr.message)}&`;
+      if (updateResult.error) {
+        console.error("[OAuth] Error updating meta_connections:", updateResult.error);
+        dbError += `conn_upd=${encodeURIComponent(updateResult.error.message)}&`;
       }
     } else {
-      const { error: insertErr } = await supabase.from("meta_connections").insert({
+      const insertResult = await supabase.from("meta_connections").insert({
         user_id: userId,
         access_token: longToken,
         is_connected: true,
         connected_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       });
-      if (insertErr) {
-        console.error("[OAuth] Error inserting meta_connections:", insertErr);
-        dbError += `conn_ins=${encodeURIComponent(insertErr.message)}&`;
+      if (insertResult.error) {
+        console.error("[OAuth] Error inserting meta_connections:", insertResult.error);
+        dbError += `conn_ins=${encodeURIComponent(insertResult.error.message)}&`;
       }
     }
 
@@ -226,19 +226,19 @@ Deno.serve(async (req: Request) => {
     };
 
     if (existingSel) {
-      const { error: selUpdateErr } = await supabase.from("meta_account_selections").update(selectionPayload).eq("user_id", userId);
-      if (selUpdateErr) {
-        console.error("[OAuth] Error updating meta_account_selections:", selUpdateErr);
-        dbError += `sel_upd=${encodeURIComponent(selUpdateErr.message)}&`;
+      const selUpdateResult = await supabase.from("meta_account_selections").update(selectionPayload).eq("user_id", userId);
+      if (selUpdateResult.error) {
+        console.error("[OAuth] Error updating meta_account_selections:", selUpdateResult.error);
+        dbError += `sel_upd=${encodeURIComponent(selUpdateResult.error.message)}&`;
       }
     } else {
-      const { error: selInsertErr } = await supabase.from("meta_account_selections").insert({
+      const selInsertResult = await supabase.from("meta_account_selections").insert({
         user_id: userId,
         ...selectionPayload
       });
-      if (selInsertErr) {
-        console.error("[OAuth] Error inserting meta_account_selections:", selInsertErr);
-        dbError += `sel_ins=${encodeURIComponent(selInsertErr.message)}&`;
+      if (selInsertResult.error) {
+        console.error("[OAuth] Error inserting meta_account_selections:", selInsertResult.error);
+        dbError += `sel_ins=${encodeURIComponent(selInsertResult.error.message)}&`;
       }
     }
 
