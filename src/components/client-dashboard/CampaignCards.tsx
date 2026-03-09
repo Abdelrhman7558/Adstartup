@@ -1,14 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NormalizedCampaign } from '../../lib/agents/CampaignAgent';
 import { Card, CardHeader, CardContent } from '../ui/Card';
 import { StatusBadge } from '../ui/StatusBadge';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, Edit2, PauseCircle, PlayCircle } from 'lucide-react';
 
 interface CampaignCardsProps {
     campaigns: NormalizedCampaign[];
 }
 
 export function CampaignCards({ campaigns }: CampaignCardsProps) {
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+    const toggleMenu = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setOpenMenuId(openMenuId === id ? null : id);
+    };
+
+    const handleAction = (action: string, campaignId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        alert(`${action} triggered for campaign ${campaignId}`);
+        setOpenMenuId(null);
+    };
+
     if (campaigns.length === 0) {
         return (
             <div className="h-48 w-full border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center text-gray-500">
@@ -37,9 +50,38 @@ export function CampaignCards({ campaigns }: CampaignCardsProps) {
                                 {campaign.status}
                             </StatusBadge>
                         </div>
-                        <button className="text-gray-400 hover:text-gray-600">
-                            <MoreVertical className="w-5 h-5" />
-                        </button>
+                        <div className="relative">
+                            <button
+                                onClick={(e) => toggleMenu(campaign.id, e)}
+                                className="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100 transition-colors"
+                            >
+                                <MoreVertical className="w-5 h-5" />
+                            </button>
+
+                            {/* Action Dropdown */}
+                            {openMenuId === campaign.id && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 z-10 py-1 animate-in fade-in zoom-in-95 duration-200">
+                                    <button
+                                        onClick={(e) => handleAction('Edit', campaign.id, e)}
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        <Edit2 className="w-4 h-4" /> Edit Campaign
+                                    </button>
+                                    <button
+                                        onClick={(e) => handleAction('Pause', campaign.id, e)}
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50 transition-colors"
+                                    >
+                                        <PauseCircle className="w-4 h-4" /> Pause
+                                    </button>
+                                    <button
+                                        onClick={(e) => handleAction('Activate', campaign.id, e)}
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
+                                    >
+                                        <PlayCircle className="w-4 h-4" /> Activate
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </CardHeader>
 
                     <CardContent className="p-6 pt-0 flex flex-col items-center">
@@ -70,6 +112,12 @@ export function CampaignCards({ campaigns }: CampaignCardsProps) {
                     </CardContent>
                 </Card>
             ))}
+            {openMenuId && (
+                <div
+                    className="fixed inset-0 z-[-1]"
+                    onClick={() => setOpenMenuId(null)}
+                />
+            )}
         </div>
     );
 }

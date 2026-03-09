@@ -5,9 +5,12 @@ interface ClientHeaderProps {
 }
 
 export function ClientHeader({ onMenuClick }: ClientHeaderProps) {
+    const handleShare = () => alert('Share link copied to clipboard!');
+    const handleNotifications = () => alert('Notifications panel toggled');
+
     return (
         <header className="sticky top-0 z-20 w-full bg-[#F8F9FA]/80 backdrop-blur-md border-b border-gray-100 h-[72px] flex items-center">
-            <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 w-full max-w-[1440px] mx-auto">
+            <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 w-full max-w-[1400px] mx-auto">
                 {/* Left Side (Menu Toggle for Mobile + Breadcrumb/Title eventually) */}
                 <div className="flex items-center gap-4">
                     <button
@@ -45,12 +48,18 @@ export function ClientHeader({ onMenuClick }: ClientHeaderProps) {
                     <div className="h-6 w-px bg-gray-200 mx-1 hidden sm:block"></div>
 
                     {/* Share Button */}
-                    <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                    <button
+                        onClick={handleShare}
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                    >
                         <span>Share</span>
                         <Share2 className="w-4 h-4 text-gray-500" />
                     </button>
 
-                    <button className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors">
+                    <button
+                        onClick={handleNotifications}
+                        className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
+                    >
                         <Bell className="w-5 h-5" />
                     </button>
                 </div>
