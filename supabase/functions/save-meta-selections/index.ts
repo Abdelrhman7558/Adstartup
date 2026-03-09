@@ -150,39 +150,12 @@ Deno.serve(async (req: Request) => {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existingSel } = await supabase.from('meta_account_selections').select('id').eq('user_id', targetUserId).maybeSingle();
-
-    let selectionData = null;
-    let selectionError = null;
-
-    if (existingSel) {
-      const result = await supabase.from('meta_account_selections').update(insertSelectionPayload).eq('user_id', targetUserId).select().maybeSingle();
-      selectionData = result.data;
-      selectionError = result.error;
-    } else {
-      const result = await supabase.from('meta_account_selections').insert(insertSelectionPayload).select().maybeSingle();
-      selectionData = result.data;
-      selectionError = result.error;
-    }
-
-    // Fallback if columns do not exist
-    if (selectionError && selectionError.code === '42703') {
-      console.warn('Column missing in meta_account_selections, retrying without optional columns...', selectionError.message);
-
-      // Remove more columns if they likely cause the error
-      const columnsToRemove = ['instagram_actor_id', 'instagram_actor_name', 'page_id', 'page_name', 'access_token'];
-      columnsToRemove.forEach(col => delete insertSelectionPayload[col]);
-
-      if (existingSel) {
-        const retryResult = await supabase.from('meta_account_selections').update(insertSelectionPayload).eq('user_id', targetUserId).select().maybeSingle();
-        selectionData = retryResult.data;
-        selectionError = retryResult.error;
-      } else {
-        const retryResult = await supabase.from('meta_account_selections').insert(insertSelectionPayload).select().maybeSingle();
-        selectionData = retryResult.data;
-        selectionError = retryResult.error;
-      }
-    }
+    // 1. Update the meta_account_selections table
+    const { data: selectionData, error: selectionError } = await supabase
+      .from('meta_account_selections')
+      .upsert(insertSelectionPayload, { onConflict: 'user_id' })
+      .select()
+      .maybeSingle();
 
     if (selectionError) {
       console.error('Error saving selections:', selectionError);
@@ -192,57 +165,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Fetch access_token from meta_connections (source of truth)
-    let savedAccessToken: string | null = null;
-    const { data: connectionData } = await supabase
-      .from('meta_connections')
-      .select('access_token')
-      .eq('user_id', targetUserId)
-      .maybeSingle();
-    savedAccessToken = connectionData?.access_token || null;
-
-    // Also update meta_connections with page, catalog data AND access_token
-    const metaConnectionData: Record<string, any> = {
+    // 2. Update the RECONSTRUCTED meta_connections table with permanent choices
+    const metaConnectionData = {
       user_id: targetUserId,
       ad_account_id: payload.ad_account_id,
       pixel_id: payload.pixel_id || null,
       page_id: payload.page_id || null,
       page_name: payload.page_name || null,
-      instagram_actor_id: payload.instagram_actor_id || null,
-      instagram_actor_name: payload.instagram_actor_name || null,
       catalog_id: payload.catalog_id || null,
       catalog_name: payload.catalog_name || null,
       is_connected: true,
       updated_at: new Date().toISOString(),
     };
 
-    if (savedAccessToken) {
-      metaConnectionData.access_token = savedAccessToken;
-    }
+    const { error: connectionError } = await supabase
+      .from('meta_connections')
+      .upsert(metaConnectionData, { onConflict: 'user_id' });
 
-    const { data: existingConn } = await supabase.from('meta_connections').select('id').eq('user_id', targetUserId).maybeSingle();
-    let connectionError = null;
-
-    if (existingConn) {
-      const result = await supabase.from('meta_connections').update(metaConnectionData).eq('user_id', targetUserId);
-      connectionError = result.error;
-    } else {
-      const result = await supabase.from('meta_connections').insert(metaConnectionData);
-      connectionError = result.error;
-    }
-
-    if (connectionError && connectionError.code === '42703') {
-      console.warn('Column missing in meta_connections, retrying without optional columns...', connectionError.message);
-      delete metaConnectionData.instagram_actor_id;
-      delete metaConnectionData.instagram_actor_name;
-
-      if (existingConn) {
-        const retryResult = await supabase.from('meta_connections').update(metaConnectionData).eq('user_id', targetUserId);
-        connectionError = retryResult.error;
-      } else {
-        const retryResult = await supabase.from('meta_connections').insert(metaConnectionData);
-        connectionError = retryResult.error;
-      }
+    if (connectionError) {
+      console.error('Error saving to meta_connections:', connectionError);
     }
 
     if (connectionError) {

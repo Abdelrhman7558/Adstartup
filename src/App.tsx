@@ -20,6 +20,13 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Payment from './pages/Payment';
 
+// React Query Setup
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
+
+// Lazy loaded Client Dashboard
+import ClientDashboard from './pages/ClientDashboard';
+
 function AppContent() {
   const { loading } = useAuth();
 
@@ -74,6 +81,14 @@ function AppContent() {
           </SubscriptionProtectedRoute>
         }
       />
+      <Route
+        path="/client-dashboard/*"
+        element={
+          <SubscriptionProtectedRoute>
+            <ClientDashboard />
+          </SubscriptionProtectedRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
@@ -84,13 +99,15 @@ function App() {
   const basename = import.meta.env.BASE_URL || '/TheAdAgent';
 
   return (
-    <BrowserRouter basename={basename}>
-      <ThemeProvider>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter basename={basename}>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 

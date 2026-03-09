@@ -174,53 +174,27 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 1. Save connection & long token
-    const { data: existingConnArr } = await supabase
-      .from("meta_connections")
-      .select("id")
-      .eq("user_id", userId)
-      .order('updated_at', { ascending: false })
-      .limit(1);
-
-    const existingConn = existingConnArr?.[0];
-
     let dbError = '';
 
-    if (existingConn) {
-      const updateResult = await supabase.from("meta_connections").update({
-        access_token: longToken,
-        is_connected: true,
-        updated_at: new Date().toISOString()
-      }).eq("user_id", userId);
-      if (updateResult.error) {
-        console.error("[OAuth] Error updating meta_connections:", updateResult.error);
-        dbError += `conn_upd=${encodeURIComponent(updateResult.error.message)}&`;
-      }
-    } else {
-      const insertResult = await supabase.from("meta_connections").insert({
+    // 1. Save connection & long token into the RECONSTRUCTED meta_connections table
+    const { error: connError } = await supabase
+      .from("meta_connections")
+      .upsert({
         user_id: userId,
         access_token: longToken,
         is_connected: true,
-        connected_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      });
-      if (insertResult.error) {
-        console.error("[OAuth] Error inserting meta_connections:", insertResult.error);
-        dbError += `conn_ins=${encodeURIComponent(insertResult.error.message)}&`;
-      }
+      }, { onConflict: 'user_id' });
+
+    if (connError) {
+      console.error("[OAuth] Error upserting meta_connections:", connError);
+      dbError += `conn_err=${encodeURIComponent(connError.message)}&`;
     }
 
-    // 2. Save discovered options for selection (JSON data column)
-    const { data: existingSelArr } = await supabase
-      .from("meta_account_selections")
-      .select("id")
-      .eq("user_id", userId)
-      .order('updated_at', { ascending: false })
-      .limit(1);
-
-    const existingSel = existingSelArr?.[0];
-
+    // 2. Save discovered options for selection
     const selectionPayload = {
+      user_id: userId,
+      access_token: longToken,
       selection_completed: false,
       webhook_response: {
         discovered_at: new Date().toISOString(),
@@ -231,21 +205,13 @@ Deno.serve(async (req: Request) => {
       updated_at: new Date().toISOString()
     };
 
-    if (existingSel) {
-      const selUpdateResult = await supabase.from("meta_account_selections").update(selectionPayload).eq("user_id", userId);
-      if (selUpdateResult.error) {
-        console.error("[OAuth] Error updating meta_account_selections:", selUpdateResult.error);
-        dbError += `sel_upd=${encodeURIComponent(selUpdateResult.error.message)}&`;
-      }
-    } else {
-      const selInsertResult = await supabase.from("meta_account_selections").insert({
-        user_id: userId,
-        ...selectionPayload
-      });
-      if (selInsertResult.error) {
-        console.error("[OAuth] Error inserting meta_account_selections:", selInsertResult.error);
-        dbError += `sel_ins=${encodeURIComponent(selInsertResult.error.message)}&`;
-      }
+    const { error: selError } = await supabase
+      .from("meta_account_selections")
+      .upsert(selectionPayload, { onConflict: 'user_id' });
+
+    if (selError) {
+      console.error("[OAuth] Error upserting meta_account_selections:", selError);
+      dbError += `sel_err=${encodeURIComponent(selError.message)}&`;
     }
 
     console.log(`[OAuth] Discovery complete. Found ${results.ad_accounts.length} accounts, ${results.pixels.length} pixels, ${results.catalogs.length} catalogs.`);
@@ -260,7 +226,7 @@ Deno.serve(async (req: Request) => {
 
   } catch (err: any) {
     console.error("[OAuth] Global callback error:", err.stack);
-    const fallback = "https://the-adagent.com/meta-callback"; // Static fallback for catastrophic errors before state decode
+    const fallback = "https://the-adagent.com/meta-callback";
     return Response.redirect(`${fallback}?error=server_error&details=${encodeURIComponent(err.message)}`, 302);
   }
 });

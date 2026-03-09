@@ -49,11 +49,12 @@ export default function Dashboard() {
       try {
         const { data } = await supabase
           .from('meta_connections')
-          .select('is_connected')
+          .select('is_connected, ad_account_id')
           .eq('user_id', user?.id)
           .maybeSingle();
 
-        const connected = !!data?.is_connected;
+        // Require ad_account_id for the connection to be considered fully setup
+        const connected = !!(data?.is_connected && data?.ad_account_id);
         setMetaConnected(connected);
 
         if (connected) {

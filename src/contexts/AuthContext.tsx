@@ -217,7 +217,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error && error.code !== 'PGRST116') throw error;
       setMetaConnection(data);
-      setIsMetaConnected(data?.is_connected ?? false);
+      // Require ad_account_id to be considered fully connected for dashboard functionality
+      setIsMetaConnected(!!(data?.is_connected && data?.ad_account_id));
     } catch (error) {
       console.error('Error loading meta connection:', error);
       setIsMetaConnected(false);
