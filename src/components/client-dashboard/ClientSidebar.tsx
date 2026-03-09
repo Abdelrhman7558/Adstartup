@@ -17,6 +17,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 interface SidebarProps {
     isOpen: boolean;
+    onClose?: () => void;
 }
 
 export function ClientSidebar({ isOpen }: SidebarProps) {
