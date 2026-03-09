@@ -63,19 +63,15 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
         >
             <div className="flex flex-col h-full w-64 px-4 py-6 overflow-y-auto">
                 {/* Logo */}
-                <div className="flex items-center gap-2 px-2 mb-8">
-                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                        <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 text-white">
-                            <path d="M13 3L4 14H12L11 21L20 10H12L13 3Z" fill="currentColor" />
-                        </svg>
-                    </div>
-                    <span className="text-xl font-bold text-gray-900 tracking-tight">Clickora</span>
+                <div className="flex items-center gap-2 px-2 mb-8 mt-2">
+                    <img src="/logo-new.png" alt="The Ad Agent Logo" className="w-10 h-10 object-contain" />
+                    <span className="text-xl font-bold text-gray-900 tracking-tight">The Ad Agent</span>
                 </div>
 
                 {/* User Card */}
                 <div className="flex items-center gap-3 p-3 mb-8 bg-gray-50/50 rounded-xl border border-gray-100/50">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 grid place-items-center overflow-hidden">
-                        <span className="text-sm font-bold text-blue-600">
+                    <div className="w-10 h-10 rounded-full bg-red-100 flex-shrink-0 grid place-items-center overflow-hidden">
+                        <span className="text-sm font-bold text-red-600">
                             {(profile?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
                         </span>
                     </div>
@@ -109,7 +105,7 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
                             className={({ isActive }) => cn(
                                 "flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                                 isActive
-                                    ? "bg-blue-50/80 text-blue-600 shadow-sm shadow-blue-100/50"
+                                    ? "bg-red-50/80 text-red-600 shadow-sm shadow-red-100/50"
                                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                             )}
                         >
@@ -130,7 +126,7 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
                             className={({ isActive }) => cn(
                                 "flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer",
                                 isActive
-                                    ? "bg-blue-50/80 text-blue-600"
+                                    ? "bg-red-50/80 text-red-600"
                                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                             )}
                         >
@@ -149,7 +145,7 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
                                     to={item.path}
                                     className={({ isActive }) => cn(
                                         "block px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                                        isActive ? "text-blue-600 font-semibold" : "text-gray-500 hover:text-gray-900"
+                                        isActive ? "text-red-600 font-semibold" : "text-gray-500 hover:text-gray-900"
                                     )}
                                 >
                                     {item.name}
@@ -167,7 +163,7 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
                             className={({ isActive }) => cn(
                                 "flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                                 isActive
-                                    ? "bg-blue-50/80 text-blue-600"
+                                    ? "bg-red-50/80 text-red-600"
                                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                             )}
                         >
@@ -201,18 +197,18 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
                 </div>
 
                 {/* AI Analytics Bottom Card */}
-                <div className="mt-8 bg-blue-600 rounded-2xl p-4 text-white relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-400/20 rounded-full blur-xl translate-y-1/2 -translate-x-1/4"></div>
+                <div className="mt-8 bg-black rounded-2xl p-4 text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-red-500/10 rounded-full blur-xl translate-y-1/2 -translate-x-1/4"></div>
 
                     <div className="relative z-10">
-                        <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center mb-3">
-                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <div className="w-8 h-8 rounded-lg bg-red-600/20 backdrop-blur-sm flex items-center justify-center mb-3">
+                            <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                             </svg>
                         </div>
                         <h4 className="font-semibold text-sm mb-1">AI Analytics</h4>
-                        <p className="text-[11px] text-blue-100 font-medium leading-relaxed">
+                        <p className="text-[11px] text-gray-400 font-medium leading-relaxed">
                             Unlock deeper data insights with AI Analytics (Beta)
                         </p>
                     </div>
