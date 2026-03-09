@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useOverviewAgent } from '../../../lib/agents/OverviewAgent';
 import { useAnalyticsAgent, TimeRange } from '../../../lib/agents/AnalyticsAgent';
 import { useCampaignsAgent } from '../../../lib/agents/CampaignAgent';
@@ -8,14 +8,14 @@ import { AnalyticsChart } from '../AnalyticsChart';
 import { ViewerBehavior } from '../ViewerBehavior';
 import { CampaignCards } from '../CampaignCards';
 import { CampaignCardsSkeleton } from '../skeletons/CampaignCardsSkeleton';
-import { ChevronDown, Info } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { cn } from '../../../lib/utils';
 
 type FilterState = 'All' | 'Active' | 'Draft';
 
 export default function OverviewModule() {
-    const [timeRange, setTimeRange] = useState<TimeRange>('all');
+    const [timeRange] = useState<TimeRange>('all');
     const [campaignFilter, setCampaignFilter] = useState<FilterState>('All');
 
     const {
@@ -39,7 +39,7 @@ export default function OverviewModule() {
     });
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 pb-12">
+        <div className="space-y-8 animate-in fade-in duration-500 pb-12 w-full">
             {/* Header Section */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -65,17 +65,25 @@ export default function OverviewModule() {
             </div>
 
             {/* Analytics Main Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
                 {isAnalyticsLoading || !analyticsData ? (
                     // Analytics Skeleton
                     <>
-                        <Card className="col-span-1 lg:col-span-2 h-[420px] bg-gray-50 animate-pulse border-gray-100 rounded-2xl"></Card>
-                        <Card className="col-span-1 h-[420px] bg-gray-50 animate-pulse border-gray-100 rounded-2xl"></Card>
+                        <div className="lg:col-span-2 min-w-0">
+                            <Card className="h-[420px] bg-gray-50 animate-pulse border-gray-100 rounded-2xl"></Card>
+                        </div>
+                        <div className="lg:col-span-1 min-w-0">
+                            <Card className="h-[420px] bg-gray-50 animate-pulse border-gray-100 rounded-2xl"></Card>
+                        </div>
                     </>
                 ) : (
                     <>
-                        <AnalyticsChart data={analyticsData.chartData} />
-                        <ViewerBehavior data={analyticsData.viewerBehavior} />
+                        <div className="lg:col-span-2 min-w-0">
+                            <AnalyticsChart data={analyticsData.chartData} />
+                        </div>
+                        <div className="lg:col-span-1 min-w-0">
+                            <ViewerBehavior data={analyticsData.viewerBehavior} />
+                        </div>
                     </>
                 )}
             </div>

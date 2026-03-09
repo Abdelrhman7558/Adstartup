@@ -48,7 +48,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function AnalyticsChart({ data }: AnalyticsChartProps) {
     return (
-        <Card className="col-span-1 lg:col-span-2 shadow-sm border border-gray-100/80 rounded-2xl">
+        <Card className="w-full shadow-sm border border-gray-100/80 rounded-2xl">
             <CardHeader className="flex flex-row items-center justify-between pb-2 border-b-0 space-y-0">
                 <div className="space-y-1">
                     <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">

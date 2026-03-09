@@ -1,4 +1,3 @@
-import React from 'react';
 import { Search, Bell, Share2, Menu } from 'lucide-react';
 import { NotificationBadge } from '../ui/NotificationBadge';
 
@@ -8,8 +7,8 @@ interface ClientHeaderProps {
 
 export function ClientHeader({ onMenuClick }: ClientHeaderProps) {
     return (
-        <header className="sticky top-0 z-20 w-full bg-[#F8F9FA]/80 backdrop-blur-md border-b border-gray-100">
-            <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16 max-w-[1600px] mx-auto">
+        <header className="sticky top-0 z-20 w-full bg-[#F8F9FA]/80 backdrop-blur-md border-b border-gray-100 h-[72px] flex items-center">
+            <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 w-full max-w-[1440px] mx-auto">
                 {/* Left Side (Menu Toggle for Mobile + Breadcrumb/Title eventually) */}
                 <div className="flex items-center gap-4">
                     <button

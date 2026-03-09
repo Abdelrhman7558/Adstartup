@@ -22,7 +22,7 @@ export function CampaignCards({ campaigns }: CampaignCardsProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {campaigns.map((campaign) => (
                 <Card key={campaign.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300 border-gray-100 rounded-2xl">
-                    <CardHeader className="flex flex-row items-center justify-between p-5 pb-3">
+                    <CardHeader className="flex flex-row items-center justify-between p-6 pb-4">
                         <div className="flex items-center gap-2">
                             <div
                                 className={`w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold ${campaign.platform === 'instagram' ? 'bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500' : 'bg-blue-600'
@@ -42,7 +42,7 @@ export function CampaignCards({ campaigns }: CampaignCardsProps) {
                         </button>
                     </CardHeader>
 
-                    <CardContent className="p-5 pt-0 flex flex-col items-center">
+                    <CardContent className="p-6 pt-0 flex flex-col items-center">
                         <div className="w-full text-left mb-6">
                             <h3 className="font-bold text-gray-900 tracking-tight text-base">{campaign.name}</h3>
                         </div>
