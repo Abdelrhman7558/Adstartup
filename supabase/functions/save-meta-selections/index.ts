@@ -96,13 +96,15 @@ Deno.serve(async (req: Request) => {
     // MANAGER PLAN LOGIC: If this is a manager adding an extra account
     if (payload.is_manager_connection) {
       // 1. Fetch the access_token from the meta_connections table (where callback saved it)
-      const { data: existingConnection, error: fetchError } = await supabase
+      const { data: existingConnData, error: fetchError } = await supabase
         .from('meta_connections')
         .select('access_token')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (fetchError || !existingConnection?.access_token) {
+      let activeAccessToken = existingConnData?.access_token;
+
+      if (fetchError || !activeAccessToken) {
         console.error('Error fetching access token for manager connection:', fetchError);
         // Fallback: try to fetch from meta_account_selections just in case
         const { data: legacySelection } = await supabase
@@ -112,11 +114,11 @@ Deno.serve(async (req: Request) => {
           .maybeSingle();
 
         if (legacySelection?.access_token) {
-          existingConnection.access_token = legacySelection.access_token;
+          activeAccessToken = legacySelection.access_token;
         }
       }
 
-      if (existingConnection?.access_token) {
+      if (activeAccessToken) {
         // 2. Insert into manager_meta_accounts
         const { error: managerInsertError } = await supabase
           .from('manager_meta_accounts')
@@ -124,7 +126,7 @@ Deno.serve(async (req: Request) => {
             user_id: user.id,
             account_id: payload.ad_account_id,
             account_name: payload.ad_account_name,
-            access_token: existingConnection.access_token
+            access_token: activeAccessToken
           });
 
         if (managerInsertError) {
@@ -168,7 +170,6 @@ Deno.serve(async (req: Request) => {
     const metaConnectionData = {
       user_id: targetUserId,
       ad_account_id: payload.ad_account_id,
-      ad_account_name: payload.ad_account_name || null,
       pixel_id: payload.pixel_id || null,
       page_id: payload.page_id || null,
       page_name: payload.page_name || null,
