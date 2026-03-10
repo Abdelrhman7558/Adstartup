@@ -8,6 +8,7 @@ const AnalyticsModule = React.lazy(() => import('../components/client-dashboard/
 const CampaignModule = React.lazy(() => import('../components/client-dashboard/modules/CampaignModule'));
 
 const IntegrationModule = React.lazy(() => import('../components/client-dashboard/modules/IntegrationModule'));
+const SettingsModule = React.lazy(() => import('../components/client-dashboard/modules/SettingsModule'));
 
 // Fallbacks for loading states
 const PageLoader = () => (
@@ -27,6 +28,7 @@ export default function ClientDashboard() {
                     <Route path="campaigns" element={<CampaignModule />} />
                     <Route path="integration" element={<IntegrationModule />} />
                     <Route path="billing" element={<div className="p-4 bg-white rounded-xl">Billing Module Placeholder</div>} />
+                    <Route path="settings" element={<SettingsModule />} />
                     <Route path="*" element={<Navigate to="overview" replace />} />
                 </Routes>
             </Suspense>

@@ -22,6 +22,7 @@ export function ClientDashboardLayout({ children }: { children?: React.ReactNode
 
                 <main className="flex-1 overflow-x-hidden overflow-y-auto">
                     <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto w-full">
+
                         {/* Dynamic Tab Content injected here via React Router */}
                         {children}
                     </div>
