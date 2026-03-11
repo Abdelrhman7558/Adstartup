@@ -40,23 +40,25 @@ Deno.serve(async (req: Request) => {
     // Try meta_connections first
     const { data: metaConnections, error: metaError } = await supabase
       .from('meta_connections')
-      .select('access_token')
+      .select('access_token, catalog_id')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
       .limit(1);
 
     const metaConnection = metaConnections?.[0];
     let accessToken = metaConnection?.access_token;
+    let savedCatalogId = metaConnection?.catalog_id;
 
     // Fallback: check meta_account_selections (token stored after OAuth)
     if (!accessToken) {
       const { data: metaSelections } = await supabase
         .from('meta_account_selections')
-        .select('access_token')
+        .select('access_token, catalog_id')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
         .limit(1);
       accessToken = metaSelections?.[0]?.access_token;
+      if (!savedCatalogId) savedCatalogId = metaSelections?.[0]?.catalog_id;
     }
 
     if (!accessToken) {
@@ -67,6 +69,20 @@ Deno.serve(async (req: Request) => {
     }
 
     let allCatalogs: any[] = [];
+
+    // If we already have a selected catalog in DB, just return that specific one
+    if (savedCatalogId) {
+      const catalogRes = await fetch(`https://graph.facebook.com/v18.0/${savedCatalogId}?access_token=${accessToken}&fields=id,name`);
+      if (catalogRes.ok) {
+        const catData = await catalogRes.json();
+        return new Response(
+          JSON.stringify({ data: [catData] }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Fallback if no specific catalog saved: fetch all catalogs via businesses
     let url: string | null = `https://graph.facebook.com/v18.0/me/businesses?access_token=${accessToken}&fields=id,name,owned_product_catalogs{id,name,product_count}&limit=100`;
 
     while (url) {
@@ -93,6 +109,8 @@ Deno.serve(async (req: Request) => {
       url = metaData.paging?.next || null;
     }
 
+    // If still empty and we know they have ONE catalog connected somehow from elsewhere, 
+    // at least we tried.
     return new Response(
       JSON.stringify({ data: allCatalogs }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
