@@ -152,12 +152,24 @@ Deno.serve(async (req: Request) => {
       updated_at: new Date().toISOString(),
     };
 
-    // 1. Update the meta_account_selections table
-    const { data: selectionData, error: selectionError } = await supabase
+    // 1. Update the meta_account_selections table (Safe Update or Insert)
+    let { data: selectionData, error: selectionError } = await supabase
       .from('meta_account_selections')
-      .upsert(insertSelectionPayload, { onConflict: 'user_id' })
+      .update(insertSelectionPayload)
+      .eq('user_id', targetUserId)
       .select()
       .maybeSingle();
+
+    if (!selectionData && (!selectionError || selectionError.code === 'PGRST116')) {
+      // No row was updated, perform insert instead
+      const insertRes = await supabase
+        .from('meta_account_selections')
+        .insert(insertSelectionPayload)
+        .select()
+        .maybeSingle();
+      selectionData = insertRes.data;
+      selectionError = insertRes.error;
+    }
 
     if (selectionError) {
       console.error('Error saving selections:', selectionError);
@@ -179,9 +191,23 @@ Deno.serve(async (req: Request) => {
       updated_at: new Date().toISOString(),
     };
 
-    const { error: connectionError } = await supabase
+    // 2. Update the meta_connections table (Safe Update or Insert)
+    let { data: connectionData, error: connectionError } = await supabase
       .from('meta_connections')
-      .upsert(metaConnectionData, { onConflict: 'user_id' });
+      .update(metaConnectionData)
+      .eq('user_id', targetUserId)
+      .select()
+      .maybeSingle();
+
+    if (!connectionData && (!connectionError || connectionError.code === 'PGRST116')) {
+       const connInsertRes = await supabase
+        .from('meta_connections')
+        .insert(metaConnectionData)
+        .select()
+        .maybeSingle();
+       connectionData = connInsertRes.data;
+       connectionError = connInsertRes.error;
+    }
 
     if (connectionError) {
       console.error('Error saving to meta_connections:', connectionError);
@@ -189,10 +215,6 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: 'Failed to save to meta_connections: ' + connectionError.message, details: connectionError }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-
-    if (connectionError) {
-      console.error('Error saving to meta_connections:', connectionError);
     }
 
     return new Response(
