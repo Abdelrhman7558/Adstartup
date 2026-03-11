@@ -106,16 +106,7 @@ Deno.serve(async (req: Request) => {
 
       if (fetchError || !activeAccessToken) {
         console.error('Error fetching access token for manager connection:', fetchError);
-        // Fallback: try to fetch from meta_account_selections just in case
-        const { data: legacySelection } = await supabase
-          .from('meta_account_selections')
-          .select('access_token')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (legacySelection?.access_token) {
-          activeAccessToken = legacySelection.access_token;
-        }
+        // Table meta_account_selections doesn't exist. Can't fallback.
       }
 
       if (activeAccessToken) {
@@ -152,33 +143,8 @@ Deno.serve(async (req: Request) => {
       updated_at: new Date().toISOString(),
     };
 
-    // 1. Update the meta_account_selections table (Safe Update or Insert)
-    let { data: selectionData, error: selectionError } = await supabase
-      .from('meta_account_selections')
-      .update(insertSelectionPayload)
-      .eq('user_id', targetUserId)
-      .select();
-
-    let finalSelectionData = selectionData && selectionData.length > 0 ? selectionData[0] : null;
-
-    if (!finalSelectionData && !selectionError) {
-      // No row was updated, perform insert instead
-      const insertRes = await supabase
-        .from('meta_account_selections')
-        .insert(insertSelectionPayload)
-        .select()
-        .maybeSingle();
-      finalSelectionData = insertRes.data;
-      selectionError = insertRes.error;
-    }
-
-    if (selectionError) {
-      console.error('Error saving selections:', selectionError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to save selections: ' + selectionError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+      // SKIP meta_account_selections: The table does not exist in production (PGRST205).
+      // We rely solely on meta_connections for storing this.
 
     const metaConnectionData = {
       user_id: targetUserId,
@@ -220,7 +186,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, data: finalSelectionData }),
+      JSON.stringify({ success: true, data: finalConnectionData }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
