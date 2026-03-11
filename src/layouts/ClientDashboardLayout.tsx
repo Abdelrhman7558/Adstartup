@@ -14,10 +14,7 @@ export function ClientDashboardLayout({ children }: { children?: React.ReactNode
             />
 
             {/* Main Content Area */}
-            <div
-                className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ease-in-out ${isSidebarOpen ? 'lg:pl-64' : 'pl-0'
-                    }`}
-            >
+            <div className="flex-1 flex flex-col min-h-screen transition-all duration-300 ease-in-out relative">
                 <ClientHeader onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
 
                 <main className="flex-1 overflow-x-hidden overflow-y-auto">
