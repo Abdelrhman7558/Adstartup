@@ -127,11 +127,28 @@ Deno.serve(async (req: Request) => {
     const totalClicks = performance.reduce((sum, p) => sum + (p.clicks || 0), 0);
     const totalConversions = performance.reduce((sum, p) => sum + (p.conversions || 0), 0);
 
+    const { data: assetsData } = await supabase
+        .from('use_asset')
+        .select('campaign_id, public_url')
+        .eq('user_id', userId)
+        .order('uploaded_at', { ascending: false });
+
+    // Build a map of campaign_id -> first asset url
+    const assetMap: Record<string, string> = {};
+    if (assetsData) {
+        for (const asset of assetsData) {
+            if (asset.campaign_id && !assetMap[asset.campaign_id] && asset.public_url) {
+                assetMap[asset.campaign_id] = asset.public_url;
+            }
+        }
+    }
+
     const campaignsWithMetrics = campaigns.map(campaign => {
       const perf = performance.find(p => p.campaign_id === campaign.id);
       const revenue = perf?.revenue || 0;
       const spend = perf?.spend || 0;
       const roas = spend > 0 ? revenue / spend : 0;
+      const thumbnail = assetMap[campaign.id] || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=400&auto=format&fit=crop';
 
       return {
         id: campaign.id,
@@ -141,7 +158,8 @@ Deno.serve(async (req: Request) => {
         roas,
         status: campaign.status,
         created_at: campaign.created_at,
-        budget: campaign.budget
+        budget: campaign.budget,
+        thumbnail: '-' // Will be updated below
       };
     });
 
@@ -154,7 +172,8 @@ Deno.serve(async (req: Request) => {
         revenue: c.revenue,
         spend: c.spend,
         roas: c.roas,
-        status: c.status
+        status: c.status,
+        thumbnail: c.thumbnail
       }));
 
     const recentCampaigns = campaignsWithMetrics
@@ -164,7 +183,8 @@ Deno.serve(async (req: Request) => {
         name: c.name,
         status: c.status,
         created_at: c.created_at,
-        budget: c.budget
+        budget: c.budget,
+        thumbnail: c.thumbnail
       }));
 
     const activeAdsCount = ads.filter(ad => ad.status === "ACTIVE").length;

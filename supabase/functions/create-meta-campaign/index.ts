@@ -1309,6 +1309,11 @@ Deno.serve(async (req: Request) => {
 
             console.log(`[CreateCampaign] Step 3 complete — Created ${results.meta_ad_ids.length} ad(s) directly.`);
 
+            if (results.meta_ad_ids.length === 0) {
+                // If we failed to create any ads, we should throw an error to surface it to the user.
+                throw new Error(`Failed to create Ad Creatives. The Campaign and AdSet were created, but Ads failed due to Meta limitations or missing permissions. Please verify your Facebook Page and Instagram Account connection, and verify Catalog permissions.`);
+            }
+
             // ─── Step 4: Update local DB with Meta IDs ──────────
 
             const { error: updateError } = await supabase

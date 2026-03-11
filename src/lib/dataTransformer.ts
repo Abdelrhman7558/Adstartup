@@ -31,6 +31,7 @@ export interface RecentCampaign {
   date_start?: string;
   date_stop?: string;
   created_at?: string;
+  thumbnail?: string;
 }
 
 export interface Ad {
@@ -44,7 +45,6 @@ export interface Ad {
   spend: number;
   ctr?: number;
   cpc?: number;
-  image_url?: string;
 }
 
 export interface InsightsData {
@@ -115,7 +115,8 @@ export function transformDashboardData(data: any): DashboardData {
     spend: safeNumber(c.spend || c.total_spend),
     date_start: c.start_time || c.start_date || c.date_start || null,
     date_stop: c.end_time || c.end_date || c.stop_time || c.date_stop || null,
-    created_at: c.created_at || new Date().toISOString()
+    created_at: c.created_at || new Date().toISOString(),
+    thumbnail: c.thumbnail
   });
 
   return {
