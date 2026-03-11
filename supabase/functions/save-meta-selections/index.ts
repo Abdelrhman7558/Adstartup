@@ -157,17 +157,18 @@ Deno.serve(async (req: Request) => {
       .from('meta_account_selections')
       .update(insertSelectionPayload)
       .eq('user_id', targetUserId)
-      .select()
-      .maybeSingle();
+      .select();
 
-    if (!selectionData && (!selectionError || selectionError.code === 'PGRST116')) {
+    let finalSelectionData = selectionData && selectionData.length > 0 ? selectionData[0] : null;
+
+    if (!finalSelectionData && !selectionError) {
       // No row was updated, perform insert instead
       const insertRes = await supabase
         .from('meta_account_selections')
         .insert(insertSelectionPayload)
         .select()
         .maybeSingle();
-      selectionData = insertRes.data;
+      finalSelectionData = insertRes.data;
       selectionError = insertRes.error;
     }
 
@@ -196,16 +197,17 @@ Deno.serve(async (req: Request) => {
       .from('meta_connections')
       .update(metaConnectionData)
       .eq('user_id', targetUserId)
-      .select()
-      .maybeSingle();
+      .select();
 
-    if (!connectionData && (!connectionError || connectionError.code === 'PGRST116')) {
+    let finalConnectionData = connectionData && connectionData.length > 0 ? connectionData[0] : null;
+
+    if (!finalConnectionData && !connectionError) {
        const connInsertRes = await supabase
         .from('meta_connections')
         .insert(metaConnectionData)
         .select()
         .maybeSingle();
-       connectionData = connInsertRes.data;
+       finalConnectionData = connInsertRes.data;
        connectionError = connInsertRes.error;
     }
 
@@ -218,7 +220,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, data: selectionData }),
+      JSON.stringify({ success: true, data: finalSelectionData }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
