@@ -154,3 +154,9 @@
     }
   }
 }
+
+@media (min-width: 1024px) {
+    .lg\:pl-64 {
+        padding-left: 2rem;
+    }
+}

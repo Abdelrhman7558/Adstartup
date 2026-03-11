@@ -1,20 +1,29 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useCampaignsAgent } from '../../../lib/agents/CampaignAgent';
 import { CampaignCards } from '../CampaignCards';
 import { CampaignCardsSkeleton } from '../skeletons/CampaignCardsSkeleton';
-import { Info } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import ClientNewCampaignModal from '../ClientNewCampaignModal';
+import { useQueryClient } from '@tanstack/react-query';
 
 type FilterState = 'All' | 'Active' | 'Draft';
 
 export default function CampaignModule() {
     const [filter, setFilter] = useState<FilterState>('All');
     const { data: campaigns, isLoading } = useCampaignsAgent();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const queryClient = useQueryClient();
 
     const filteredCampaigns = campaigns?.filter(c => {
         if (filter === 'All') return true;
         return c.status.toLowerCase() === filter.toLowerCase();
     });
+
+    const handleCampaignCreated = () => {
+        // Refresh campaign data
+        queryClient.invalidateQueries({ queryKey: ['dashboard_data_master'] });
+    };
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-12">
@@ -29,22 +38,33 @@ export default function CampaignModule() {
                     <p className="text-gray-500 text-sm mt-1 font-medium">1 October - 31 October 2025</p>
                 </div>
 
-                {/* Filter Toggle */}
-                <div className="flex items-center bg-gray-100/80 p-1 rounded-xl">
-                    {(['All', 'Active', 'Draft'] as FilterState[]).map((f) => (
-                        <button
-                            key={f}
-                            onClick={() => setFilter(f)}
-                            className={cn(
-                                "px-5 py-1.5 text-sm font-semibold rounded-lg transition-all duration-200",
-                                filter === f
-                                    ? "bg-white shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)] text-gray-900"
-                                    : "text-gray-500 hover:text-gray-700"
-                            )}
-                        >
-                            {f}
-                        </button>
-                    ))}
+                <div className="flex items-center gap-3">
+                    {/* Filter Toggle */}
+                    <div className="flex items-center bg-gray-100/80 p-1 rounded-xl">
+                        {(['All', 'Active', 'Draft'] as FilterState[]).map((f) => (
+                            <button
+                                key={f}
+                                onClick={() => setFilter(f)}
+                                className={cn(
+                                    "px-5 py-1.5 text-sm font-semibold rounded-lg transition-all duration-200",
+                                    filter === f
+                                        ? "bg-white shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)] text-gray-900"
+                                        : "text-gray-500 hover:text-gray-700"
+                                )}
+                            >
+                                {f}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* New Campaign Button */}
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-xl hover:bg-red-600 transition-all shadow-sm shadow-red-200 hover:shadow-md hover:shadow-red-200"
+                    >
+                        <Plus className="w-4 h-4" />
+                        New Campaign
+                    </button>
                 </div>
             </div>
 
@@ -53,6 +73,13 @@ export default function CampaignModule() {
             ) : (
                 <CampaignCards campaigns={filteredCampaigns} />
             )}
+
+            {/* Campaign Creation Modal */}
+            <ClientNewCampaignModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSuccess={handleCampaignCreated}
+            />
         </div>
     );
 }

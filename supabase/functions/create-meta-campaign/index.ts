@@ -327,6 +327,7 @@ async function fetchPixelForAccount(
 
 // ─── Map objective to Meta API values ───────────────────────────
 
+
 function mapObjective(objective: string): string {
     const mapping: Record<string, string> = {
         'sales': 'OUTCOME_SALES',
@@ -1032,88 +1033,101 @@ Deno.serve(async (req: Request) => {
             createdResources.push({ type: 'adset', id: results.meta_adset_id });
             console.log('[CreateCampaign] ✅ AdSet created:', results.meta_adset_id);
 
-            // ─── Step 3: Build Strategy-Aware Ads & Send to n8n ──────────
+            // ─── Step 3: Create Creatives & Ads DIRECTLY via Meta API ──────
+            // (No n8n webhook — everything done here)
 
-            console.log('[CreateCampaign] Step 3 - Building ads based on strategy:', strategy.name);
-
-            const n8nWebhookUrl = 'https://n8n.srv1181726.hstgr.cloud/webhook-test/Creative&Ad';
+            console.log('[CreateCampaign] Step 3 - Creating Creatives & Ads directly via Meta API. Strategy:', strategy.name);
 
             const catalogId = payload.catalog_id || meta_connection?.catalog_id;
             const websiteUrl = userBrief.website_url || userBrief.websiteUrl || 'https://atlantis-ads.com';
-
-            // ─── Build creative_specs[] and ad_specs[] per strategy ─────
-
-            const creative_specs: any[] = [];
-            const ad_specs: any[] = [];
 
             if (strategy.is_catalog) {
                 // ═══ CATALOG STRATEGIES ═══════════════════════════════════
                 if (strategy.name === 'catalog_format_blender') {
                     // 3 Ads: Single Image, Carousel, Collection
-                    // IMPORTANT: For catalog ads, template_data defaults to carousel.
-                    // Single Image MUST have force_single_link: true to render as single product.
-                    creative_specs.push(
+                    const formats = [
                         {
                             name: `${payload.campaign_name} - Single Image`,
-                            format: 'SINGLE_IMAGE',
-                            object_story_spec: {
-                                page_id: pageId,
-                                instagram_actor_id: instagramActorId,
-                                template_data: {
-                                    message: payload.description || 'Shop now!',
-                                    link: websiteUrl,
-                                    call_to_action: { type: 'SHOP_NOW' },
-                                    force_single_link: true,
-                                },
+                            template_data: {
+                                message: payload.description || 'Shop now!',
+                                link: websiteUrl,
+                                call_to_action: { type: 'SHOP_NOW' },
+                                force_single_link: true,
                             },
-                            product_set_id: productSetId,
                         },
                         {
                             name: `${payload.campaign_name} - Carousel`,
-                            format: 'CAROUSEL',
-                            object_story_spec: {
-                                page_id: pageId,
-                                instagram_actor_id: instagramActorId,
-                                template_data: {
-                                    message: payload.description || 'Browse our collection!',
-                                    link: websiteUrl,
-                                    call_to_action: { type: 'SHOP_NOW' },
-                                    multi_share_end_card: true,
-                                },
+                            template_data: {
+                                message: payload.description || 'Browse our collection!',
+                                link: websiteUrl,
+                                call_to_action: { type: 'SHOP_NOW' },
+                                multi_share_end_card: true,
                             },
-                            product_set_id: productSetId,
                         },
                         {
                             name: `${payload.campaign_name} - Collection`,
-                            format: 'COLLECTION',
+                            template_data: {
+                                message: payload.description || 'Discover more products!',
+                                link: websiteUrl,
+                                call_to_action: { type: 'SHOP_NOW' },
+                                retailer_item_ids: [],
+                                applink_treatment: 'web_only',
+                            },
+                        },
+                    ];
+
+                    for (const fmt of formats) {
+                        const creativeParams: Record<string, any> = {
+                            name: fmt.name,
                             object_story_spec: {
                                 page_id: pageId,
-                                instagram_actor_id: instagramActorId,
-                                template_data: {
-                                    message: payload.description || 'Discover more products!',
-                                    link: websiteUrl,
-                                    call_to_action: { type: 'SHOP_NOW' },
-                                    retailer_item_ids: [],
-                                    applink_treatment: 'web_only',
-                                },
+                                ...(instagramActorId ? { instagram_actor_id: instagramActorId } : {}),
+                                template_data: fmt.template_data,
                             },
-                            product_set_id: productSetId,
+                            ...(productSetId ? { product_set_id: productSetId } : {}),
+                        };
+
+                        console.log(`[CreateCampaign] Creating catalog creative: ${fmt.name}`);
+                        const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
+                        if (!creativeResult.success) {
+                            console.warn(`[CreateCampaign] ⚠️ Creative failed: ${creativeResult.error}. Skipping.`);
+                            continue;
                         }
-                    );
+
+                        const creativeId = creativeResult.data.id;
+                        createdResources.push({ type: 'creative', id: creativeId });
+                        console.log(`[CreateCampaign] ✅ Creative created: ${creativeId}`);
+
+                        // Create Ad
+                        const adParams = {
+                            name: `${fmt.name} - Ad`,
+                            adset_id: results.meta_adset_id,
+                            creative: { creative_id: creativeId },
+                            status: 'PAUSED',
+                        };
+                        const adResult = await metaApiPost(`/${adAccountId}/ads`, accessToken, adParams);
+                        if (adResult.success) {
+                            results.meta_ad_ids.push(adResult.data.id);
+                            createdResources.push({ type: 'ad', id: adResult.data.id });
+                            console.log(`[CreateCampaign] ✅ Ad created: ${adResult.data.id}`);
+                        } else {
+                            console.warn(`[CreateCampaign] ⚠️ Ad creation failed: ${adResult.error}`);
+                        }
+                    }
+
                 } else if (strategy.name === 'catalog_carousel_10') {
-                    // 10 Carousel Ads with different angles
                     const angles = [
                         'Best Sellers', 'New Arrivals', 'Top Rated', 'Limited Offer',
                         'Customer Favorites', 'Trending Now', 'Flash Sale', 'Featured Collection',
                         'Exclusive Deals', 'Popular Picks'
                     ];
                     for (let i = 0; i < 10; i++) {
-                        creative_specs.push({
-                            name: `${payload.campaign_name} - Carousel ${i + 1} (${angles[i]})`,
-                            format: 'CAROUSEL',
+                        const cName = `${payload.campaign_name} - Carousel ${i + 1} (${angles[i]})`;
+                        const creativeParams: Record<string, any> = {
+                            name: cName,
                             object_story_spec: {
                                 page_id: pageId,
-                                instagram_actor_id: instagramActorId,
+                                ...(instagramActorId ? { instagram_actor_id: instagramActorId } : {}),
                                 template_data: {
                                     message: `${angles[i]} — ${payload.description || 'Shop now!'}`,
                                     link: websiteUrl,
@@ -1121,21 +1135,32 @@ Deno.serve(async (req: Request) => {
                                     multi_share_end_card: true,
                                 },
                             },
-                            product_set_id: productSetId,
+                            ...(productSetId ? { product_set_id: productSetId } : {}),
+                        };
+                        const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
+                        if (!creativeResult.success) { console.warn(`[CreateCampaign] ⚠️ Creative ${i} failed: ${creativeResult.error}`); continue; }
+                        const creativeId = creativeResult.data.id;
+                        createdResources.push({ type: 'creative', id: creativeId });
+
+                        const adResult = await metaApiPost(`/${adAccountId}/ads`, accessToken, {
+                            name: `${cName} - Ad`, adset_id: results.meta_adset_id,
+                            creative: { creative_id: creativeId }, status: 'PAUSED',
                         });
+                        if (adResult.success) {
+                            results.meta_ad_ids.push(adResult.data.id);
+                            createdResources.push({ type: 'ad', id: adResult.data.id });
+                        }
                     }
+
                 } else if (strategy.name === 'catalog_carousel_isolated') {
-                    // 5 Isolated Carousel Ads (each in its own adset, but webhook handles that)
                     const angles = ['Story A', 'Story B', 'Story C', 'Story D', 'Story E'];
                     for (let i = 0; i < 5; i++) {
-                        creative_specs.push({
-                            name: `${payload.campaign_name} - Carousel ${angles[i]}`,
-                            format: 'CAROUSEL',
-                            isolated_adset: true, // Signal to n8n: create separate adset for each
-                            adset_daily_budget: strategy.daily_budget_per_adset,
+                        const cName = `${payload.campaign_name} - Carousel ${angles[i]}`;
+                        const creativeParams: Record<string, any> = {
+                            name: cName,
                             object_story_spec: {
                                 page_id: pageId,
-                                instagram_actor_id: instagramActorId,
+                                ...(instagramActorId ? { instagram_actor_id: instagramActorId } : {}),
                                 template_data: {
                                     message: `${angles[i]} — ${payload.description || 'Shop now!'}`,
                                     link: websiteUrl,
@@ -1143,134 +1168,146 @@ Deno.serve(async (req: Request) => {
                                     multi_share_end_card: true,
                                 },
                             },
-                            product_set_id: productSetId,
+                            ...(productSetId ? { product_set_id: productSetId } : {}),
+                        };
+                        const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
+                        if (!creativeResult.success) { console.warn(`[CreateCampaign] ⚠️ Isolated creative ${i} failed: ${creativeResult.error}`); continue; }
+                        const creativeId = creativeResult.data.id;
+                        createdResources.push({ type: 'creative', id: creativeId });
+
+                        const adResult = await metaApiPost(`/${adAccountId}/ads`, accessToken, {
+                            name: `${cName} - Ad`, adset_id: results.meta_adset_id,
+                            creative: { creative_id: creativeId }, status: 'PAUSED',
                         });
+                        if (adResult.success) {
+                            results.meta_ad_ids.push(adResult.data.id);
+                            createdResources.push({ type: 'ad', id: adResult.data.id });
+                        }
                     }
                 }
+
             } else {
                 // ═══ UPLOAD STRATEGIES ════════════════════════════════════
                 const assets = payload.assets || [];
 
                 if (strategy.name === 'flexible_blender') {
-                    // 1 Flexible Ad with ALL creatives inside
-                    const images = assets.filter(a => a.file_type?.startsWith('image/')).map(a => a.file_url);
-                    const videos = assets.filter(a => a.file_type?.startsWith('video/')).map(a => a.file_url);
+                    // Flexible Ad: upload all images, build asset_feed_spec
+                    const imageHashes: string[] = [];
+                    const videoIds: string[] = [];
 
-                    creative_specs.push({
-                        name: `${payload.campaign_name} - Flexible`,
-                        format: 'FLEXIBLE',
-                        flexible_ad: true,
-                        images: images,
-                        videos: videos,
-                        primary_texts: [payload.description || 'Check this out!'],
-                        headlines: [payload.campaign_name],
-                        descriptions: [payload.offer || ''],
-                        object_story_spec: {
-                            page_id: pageId,
-                            instagram_actor_id: instagramActorId,
-                            link_data: {
-                                message: payload.description,
-                                link: websiteUrl,
-                            },
-                        },
-                    });
-                } else if (strategy.name === 'abo_multi_adset') {
-                    // 1 Ad per creative (3-5 ads in same adset)
-                    for (let i = 0; i < assets.length && i < 5; i++) {
-                        creative_specs.push({
-                            name: `${payload.campaign_name} - Creative ${i + 1}`,
-                            format: assets[i].file_type?.startsWith('video/') ? 'VIDEO' : 'SINGLE_IMAGE',
-                            object_story_spec: {
-                                page_id: pageId,
-                                instagram_actor_id: instagramActorId,
-                                link_data: {
-                                    message: payload.description,
-                                    link: websiteUrl,
-                                    picture: assets[i].file_url,
-                                },
-                            },
-                            asset_url: assets[i].file_url,
-                            asset_type: assets[i].file_type,
-                        });
+                    for (const asset of assets) {
+                        if (asset.file_type?.startsWith('image/')) {
+                            const uploadResult = await uploadImageToMeta(adAccountId, accessToken as string, asset.file_url);
+                            if (uploadResult.success && uploadResult.imageHash) {
+                                imageHashes.push(uploadResult.imageHash);
+                            }
+                        }
+                        // Video upload requires different approach (advideos endpoint) — skip for now
                     }
-                } else if (strategy.name === 'abo_single_ads') {
-                    // 1 Ad per creative, each in its own adset
-                    for (let i = 0; i < assets.length; i++) {
-                        creative_specs.push({
-                            name: `${payload.campaign_name} - Creative ${i + 1}`,
-                            format: assets[i].file_type?.startsWith('video/') ? 'VIDEO' : 'SINGLE_IMAGE',
-                            isolated_adset: true, // Signal to n8n: create separate adset for each
-                            adset_daily_budget: strategy.daily_budget_per_adset,
+
+                    if (imageHashes.length > 0) {
+                        // Build asset_feed_spec for flexible ad
+                        const images = imageHashes.map(hash => ({ hash }));
+                        const creativeParams: Record<string, any> = {
+                            name: `${payload.campaign_name} - Flexible`,
                             object_story_spec: {
                                 page_id: pageId,
-                                instagram_actor_id: instagramActorId,
+                                ...(instagramActorId ? { instagram_actor_id: instagramActorId } : {}),
                                 link_data: {
-                                    message: payload.description,
+                                    message: payload.description || 'Check this out!',
                                     link: websiteUrl,
-                                    picture: assets[i].file_url,
+                                    call_to_action: { type: 'SHOP_NOW' },
+                                    image_hash: imageHashes[0],
                                 },
                             },
-                            asset_url: assets[i].file_url,
-                            asset_type: assets[i].file_type,
-                        });
+                            asset_feed_spec: {
+                                images: images,
+                                bodies: [{ text: payload.description || 'Check this out!' }],
+                                titles: [{ text: payload.campaign_name }],
+                                descriptions: payload.offer ? [{ text: payload.offer }] : [{ text: '' }],
+                                link_urls: [{ website_url: websiteUrl }],
+                                call_to_action_types: ['SHOP_NOW'],
+                            },
+                        };
+
+                        const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
+                        if (creativeResult.success) {
+                            const creativeId = creativeResult.data.id;
+                            results.meta_creative_id = creativeId;
+                            createdResources.push({ type: 'creative', id: creativeId });
+                            console.log(`[CreateCampaign] ✅ Flexible creative: ${creativeId}`);
+
+                            const adResult = await metaApiPost(`/${adAccountId}/ads`, accessToken, {
+                                name: `${payload.campaign_name} - Flexible Ad`,
+                                adset_id: results.meta_adset_id,
+                                creative: { creative_id: creativeId },
+                                status: 'PAUSED',
+                            });
+                            if (adResult.success) {
+                                results.meta_ad_ids.push(adResult.data.id);
+                                createdResources.push({ type: 'ad', id: adResult.data.id });
+                                console.log(`[CreateCampaign] ✅ Flexible ad: ${adResult.data.id}`);
+                            }
+                        } else {
+                            console.warn(`[CreateCampaign] ⚠️ Flexible creative failed: ${creativeResult.error}`);
+                        }
+                    } else {
+                        console.warn('[CreateCampaign] No image hashes obtained for flexible ad. Falling back to single image ads.');
+                    }
+
+                } else {
+                    // abo_multi_adset or abo_single_ads: 1 ad per asset
+                    const maxAds = strategy.name === 'abo_multi_adset' ? Math.min(assets.length, 5) : assets.length;
+
+                    for (let i = 0; i < maxAds; i++) {
+                        const asset = assets[i];
+                        const cName = `${payload.campaign_name} - Creative ${i + 1}`;
+
+                        if (asset.file_type?.startsWith('image/')) {
+                            // Upload image and create ad
+                            const uploadResult = await uploadImageToMeta(adAccountId, accessToken as string, asset.file_url);
+                            if (!uploadResult.success || !uploadResult.imageHash) {
+                                console.warn(`[CreateCampaign] ⚠️ Image upload failed for asset ${i}: ${uploadResult.error}`);
+                                continue;
+                            }
+
+                            const creativeParams = {
+                                name: cName,
+                                object_story_spec: {
+                                    page_id: pageId,
+                                    ...(instagramActorId ? { instagram_actor_id: instagramActorId } : {}),
+                                    link_data: {
+                                        message: payload.description || '',
+                                        link: websiteUrl,
+                                        image_hash: uploadResult.imageHash,
+                                        call_to_action: { type: 'SHOP_NOW' },
+                                    },
+                                },
+                            };
+
+                            const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
+                            if (!creativeResult.success) {
+                                console.warn(`[CreateCampaign] ⚠️ Creative ${i} failed: ${creativeResult.error}`);
+                                continue;
+                            }
+                            const creativeId = creativeResult.data.id;
+                            createdResources.push({ type: 'creative', id: creativeId });
+
+                            const adResult = await metaApiPost(`/${adAccountId}/ads`, accessToken, {
+                                name: `${cName} - Ad`, adset_id: results.meta_adset_id,
+                                creative: { creative_id: creativeId }, status: 'PAUSED',
+                            });
+                            if (adResult.success) {
+                                results.meta_ad_ids.push(adResult.data.id);
+                                createdResources.push({ type: 'ad', id: adResult.data.id });
+                            }
+                        }
+                        // Video assets: would require advideos upload — skipped for now
                     }
                 }
             }
 
-            // Build matching ad_specs for each creative
-            for (let i = 0; i < creative_specs.length; i++) {
-                ad_specs.push({
-                    name: `${creative_specs[i].name} - Ad`,
-                    adset_id: creative_specs[i].isolated_adset ? 'WILL_BE_CREATED_BY_N8N' : results.meta_adset_id,
-                    creative: { creative_id: 'WILL_BE_REPLACED_BY_N8N' },
-                    status: 'PAUSED',
-                    format: creative_specs[i].format,
-                });
-            }
-
-            console.log(`[CreateCampaign] Built ${creative_specs.length} creative(s) and ${ad_specs.length} ad(s) for strategy: ${strategy.name}`);
-
-            const webhookPayload = {
-                campaign_id: payload.campaign_id,
-                meta_campaign_id: results.meta_campaign_id,
-                meta_adset_id: results.meta_adset_id,
-                ad_account_id: adAccountId,
-                pixel_id: resolvedPixelId || payload.pixel_id || meta_connection?.pixel_id,
-                catalog_id: catalogId,
-                product_set_id: productSetId,
-                page_id: pageId,
-                instagram_actor_id: instagramActorId || null,
-                access_token: accessToken,
-                asset_type: payload.asset_type,
-                // ─── Strategy-Aware Ads (Multiple) ───────────────────
-                creative_specs: creative_specs,
-                ad_specs: ad_specs,
-                total_ads: creative_specs.length,
-                // ─── AI Agent Context ────────────────────────────────
-                strategy: {
-                    name: strategy.name,
-                    display_name: strategy.display_name,
-                    budget_type: strategy.budget_type,
-                    adset_count: strategy.adset_count,
-                    ads_per_adset: strategy.ads_per_adset,
-                    flexible_ad: strategy.flexible_ad,
-                    daily_budget_per_adset: strategy.daily_budget_per_adset,
-                    description: strategy.description,
-                },
-                brief: userBrief,
-                original_request_body: payload
-            };
-
-            console.log('[CreateCampaign] Webhook destination:', n8nWebhookUrl);
-
-            const webhookResponse = await fetch(n8nWebhookUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(webhookPayload)
-            });
-
-            const webhookResult = await webhookResponse.text();
-            console.log('[CreateCampaign] n8n Response:', webhookResult);
+            console.log(`[CreateCampaign] Step 3 complete — Created ${results.meta_ad_ids.length} ad(s) directly.`);
 
             // ─── Step 4: Update local DB with Meta IDs ──────────
 
@@ -1278,7 +1315,7 @@ Deno.serve(async (req: Request) => {
                 .from('campaigns')
                 .update({
                     meta_campaign_id: results.meta_campaign_id,
-                    status: 'active', // Mark as active so it appears in the frontend Campaigns view
+                    status: 'active',
                     updated_at: new Date().toISOString(),
                 })
                 .eq('id', payload.campaign_id)
@@ -1299,21 +1336,21 @@ Deno.serve(async (req: Request) => {
                 metadata: { type: 'adset', meta_adset_id: results.meta_adset_id }
             });
 
-            // Track pending Ad creation (all ads from strategy)
-            for (const adSpec of ad_specs) {
+            // Track created Ads
+            for (const adId of results.meta_ad_ids) {
                 await supabase.from('ads').insert({
                     user_id: payload.user_id,
-                    name: adSpec.name,
-                    status: 'pending_n8n',
+                    name: `${payload.campaign_name} - Ad`,
+                    status: 'PAUSED',
                     campaign_id: results.meta_campaign_id,
                     ad_account_id: adAccountId,
-                    created_by: 'edge_function_ad_placeholder',
-                    metadata: { type: 'ad', format: adSpec.format, linked_adset_id: results.meta_adset_id }
+                    created_by: 'edge_function_ad',
+                    metadata: { type: 'ad', meta_ad_id: adId, linked_adset_id: results.meta_adset_id }
                 });
             }
 
             results.success = true;
-            results.message = 'Campaign and AdSet created. Sent to n8n for Creative and Ad processing.';
+            results.message = `Campaign, AdSet, and ${results.meta_ad_ids.length} Ad(s) created successfully on Meta!`;
 
             // Save final success debug data
             await supabase.from('meta_account_selections').upsert({
@@ -1321,22 +1358,24 @@ Deno.serve(async (req: Request) => {
                 webhook_response: {
                     debug_step: 'SUCCESS',
                     results: results,
-                    webhook_sent: true,
+                    ads_created_directly: true,
+                    total_ads: results.meta_ad_ids.length,
                     timestamp: new Date().toISOString()
                 },
                 updated_at: new Date().toISOString()
             }, { onConflict: 'user_id' });
 
-            console.log('[CreateCampaign] ✅ Phase 1 created successfully!', results);
+            console.log('[CreateCampaign] ✅ FULL campaign created successfully!', results);
 
             return new Response(
                 JSON.stringify({
                     success: true,
-                    message: 'Campaign and AdSet created successfully!',
+                    message: results.message,
                     data: results,
                 }),
                 { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
+
 
         } catch (error: any) {
             console.error('[CreateCampaign] Fatal error:', error.message);
