@@ -83,7 +83,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Fallback if no specific catalog saved: fetch all catalogs via businesses
-    let url: string | null = `https://graph.facebook.com/v18.0/me/businesses?access_token=${accessToken}&fields=id,name,owned_product_catalogs{id,name,product_count}&limit=100`;
+    let url: string | null = `https://graph.facebook.com/v18.0/me/businesses?access_token=${accessToken}&fields=id,name,owned_product_catalogs{id,name,product_count},client_product_catalogs{id,name,product_count}&limit=100`;
 
     while (url) {
       const metaResponse = await fetch(url);
@@ -102,6 +102,9 @@ Deno.serve(async (req: Request) => {
         metaData.data.forEach((business: any) => {
           if (business.owned_product_catalogs?.data) {
             allCatalogs.push(...business.owned_product_catalogs.data);
+          }
+          if (business.client_product_catalogs?.data) {
+            allCatalogs.push(...business.client_product_catalogs.data);
           }
         });
       }
