@@ -191,29 +191,9 @@ Deno.serve(async (req: Request) => {
       dbError += `conn_err=${encodeURIComponent(connError.message)}&`;
     }
 
-    // 2. Save discovered options for selection
-    const selectionPayload = {
-      user_id: userId,
-      access_token: longToken,
-      selection_completed: false,
-      webhook_response: {
-        discovered_at: new Date().toISOString(),
-        ad_accounts: results.ad_accounts,
-        pixels: results.pixels,
-        catalogs: results.catalogs
-      },
-      updated_at: new Date().toISOString()
-    };
-
-    const { error: selError } = await supabase
-      .from("meta_account_selections")
-      .upsert(selectionPayload, { onConflict: 'user_id' });
-
-    if (selError) {
-      console.error("[OAuth] Error upserting meta_account_selections:", selError);
-      dbError += `sel_err=${encodeURIComponent(selError.message)}&`;
-    }
-
+    // 2. We skip saving to meta_account_selections because that table 
+    // was removed in favor of direct meta_connections updates to simplify the schema.
+    
     console.log(`[OAuth] Discovery complete. Found ${results.ad_accounts.length} accounts, ${results.pixels.length} pixels, ${results.catalogs.length} catalogs.`);
 
     // ─── Final Redirect ──────────────────────────────────────────────

@@ -53,8 +53,9 @@ export default function Dashboard() {
           .eq('user_id', user?.id)
           .maybeSingle();
 
-        // Require ad_account_id for the connection to be considered fully setup
-        const connected = !!(data?.is_connected && data?.ad_account_id);
+        // We only require is_connected to be true for the UI to reflect a connection.
+        // Ad account might be fetched later or not present initially depending on the flow.
+        const connected = !!data?.is_connected;
         setMetaConnected(connected);
 
         if (connected) {

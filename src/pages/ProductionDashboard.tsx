@@ -84,7 +84,7 @@ export default function ProductionDashboard() {
       .eq('user_id', user.id)
       .maybeSingle();
 
-    setIsMetaConnected(data?.is_connected || false);
+    setIsMetaConnected(!!data?.is_connected);
   };
 
   const loadDashboardData = async () => {
