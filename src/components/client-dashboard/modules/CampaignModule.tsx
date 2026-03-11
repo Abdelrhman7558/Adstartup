@@ -4,26 +4,17 @@ import { CampaignCards } from '../CampaignCards';
 import { CampaignCardsSkeleton } from '../skeletons/CampaignCardsSkeleton';
 import { Plus } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import ClientNewCampaignModal from '../ClientNewCampaignModal';
-import { useQueryClient } from '@tanstack/react-query';
 
 type FilterState = 'All' | 'Active' | 'Draft';
 
 export default function CampaignModule() {
     const [filter, setFilter] = useState<FilterState>('All');
     const { data: campaigns, isLoading } = useCampaignsAgent();
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const queryClient = useQueryClient();
 
     const filteredCampaigns = campaigns?.filter(c => {
         if (filter === 'All') return true;
         return c.status.toLowerCase() === filter.toLowerCase();
     });
-
-    const handleCampaignCreated = () => {
-        // Refresh campaign data
-        queryClient.invalidateQueries({ queryKey: ['dashboard_data_master'] });
-    };
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-12">
@@ -59,7 +50,7 @@ export default function CampaignModule() {
 
                     {/* New Campaign Button */}
                     <button
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={() => window.dispatchEvent(new Event('openNewCampaignModal'))}
                         className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-xl hover:bg-red-600 transition-all shadow-sm shadow-red-200 hover:shadow-md hover:shadow-red-200"
                     >
                         <Plus className="w-4 h-4" />
@@ -73,13 +64,6 @@ export default function CampaignModule() {
             ) : (
                 <CampaignCards campaigns={filteredCampaigns} />
             )}
-
-            {/* Campaign Creation Modal */}
-            <ClientNewCampaignModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSuccess={handleCampaignCreated}
-            />
         </div>
     );
 }

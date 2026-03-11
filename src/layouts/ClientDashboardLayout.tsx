@@ -1,9 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ClientSidebar } from '../components/client-dashboard/ClientSidebar';
 import { ClientHeader } from '../components/client-dashboard/ClientHeader';
+import ClientNewCampaignModal from '../components/client-dashboard/ClientNewCampaignModal';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function ClientDashboardLayout({ children }: { children?: React.ReactNode }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+    const queryClient = useQueryClient();
+
+    useEffect(() => {
+        const handleOpenModal = () => setIsCampaignModalOpen(true);
+        window.addEventListener('openNewCampaignModal', handleOpenModal);
+        return () => window.removeEventListener('openNewCampaignModal', handleOpenModal);
+    }, []);
+
+    const handleCampaignCreated = () => {
+        queryClient.invalidateQueries({ queryKey: ['dashboard_data_master'] });
+        queryClient.invalidateQueries({ queryKey: ['agent_campaigns'] });
+    };
 
     return (
         <div className="min-h-screen bg-[#F8F9FA] flex font-sans text-gray-900">
@@ -33,6 +48,13 @@ export function ClientDashboardLayout({ children }: { children?: React.ReactNode
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
+
+            {/* Global Campaign Creation Modal */}
+            <ClientNewCampaignModal
+                isOpen={isCampaignModalOpen}
+                onClose={() => setIsCampaignModalOpen(false)}
+                onSuccess={handleCampaignCreated}
+            />
         </div>
     );
 }

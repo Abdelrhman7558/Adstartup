@@ -134,18 +134,12 @@ export default function ClientNewCampaignModal({ isOpen, onClose, onSuccess }: C
     const loadPages = async () => {
         if (!user) return;
         try {
-            const { data, error } = await supabase
-                .from('meta_connections')
-                .select('page_id, page_name')
-                .eq('user_id', user.id)
-                .eq('is_connected', true)
-                .not('page_id', 'is', null)
-                .not('page_name', 'is', null);
+            const { data, error } = await supabase.functions.invoke('get-pages');
 
             if (error) throw error;
-            const formatted = (data || [])
-                .filter(item => item.page_id && item.page_name)
-                .map(item => ({ page_id: item.page_id, page_name: item.page_name }));
+            const formatted = (data?.data || [])
+                .filter((item: any) => item.page_id && item.page_name)
+                .map((item: any) => ({ page_id: item.page_id, page_name: item.page_name }));
             setPages(formatted);
         } catch (err) {
             console.error('Failed to load pages:', err);
@@ -155,16 +149,13 @@ export default function ClientNewCampaignModal({ isOpen, onClose, onSuccess }: C
     const loadCatalogs = async () => {
         if (!user) return;
         try {
-            const { data, error } = await supabase
-                .from('meta_connections')
-                .select('catalog_id, catalog_name')
-                .eq('user_id', user.id)
-                .eq('is_connected', true)
-                .maybeSingle();
+            const { data, error } = await supabase.functions.invoke('get-catalogs');
             if (error) throw error;
-            if (data?.catalog_id && data?.catalog_name) {
-                setCatalogs([{ catalog_id: data.catalog_id, catalog_name: data.catalog_name }]);
-            }
+            const formatted = (data?.data || []).map((item: any) => ({
+                catalog_id: item.id,
+                catalog_name: item.name
+            }));
+            setCatalogs(formatted);
         } catch (err) {
             console.error('Failed to load catalogs:', err);
         }
