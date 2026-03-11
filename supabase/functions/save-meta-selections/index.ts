@@ -151,9 +151,7 @@ Deno.serve(async (req: Request) => {
       ad_account_id: payload.ad_account_id,
       pixel_id: payload.pixel_id || null,
       page_id: payload.page_id || null,
-      page_name: payload.page_name || null,
       catalog_id: payload.catalog_id || null,
-      catalog_name: payload.catalog_name || null,
       is_connected: true,
       updated_at: new Date().toISOString(),
     };
