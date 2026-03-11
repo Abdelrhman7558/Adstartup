@@ -113,7 +113,14 @@ Deno.serve(async (req: Request) => {
     }
 
     // If still empty and we know they have ONE catalog connected somehow from elsewhere, 
-    // at least we tried.
+    // at least we tried. We should force it into the list so the frontend doesn't break.
+    if (allCatalogs.length === 0 && savedCatalogId) {
+        allCatalogs.push({
+            id: savedCatalogId,
+            name: 'Integrated Catalog'
+        });
+    }
+
     return new Response(
       JSON.stringify({ data: allCatalogs }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
