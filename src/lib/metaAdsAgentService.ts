@@ -150,7 +150,7 @@ export async function fetchMetaConnection(userId: string): Promise<MetaConnectio
 
         const { data, error } = await supabase
             .from('meta_connections')
-            .select('ad_account_id, pixel_id, catalog_id, catalog_name, page_id, page_name, instagram_actor_id, access_token')
+            .select('ad_account_id, pixel_id, catalog_id, page_id, access_token, is_connected')
             .eq('user_id', userId)
             .eq('is_connected', true)
             .maybeSingle();
@@ -177,10 +177,10 @@ export async function fetchMetaConnection(userId: string): Promise<MetaConnectio
             ad_account_id: data.ad_account_id || null,
             pixel_id: data.pixel_id || null,
             catalog_id: data.catalog_id || null,
-            catalog_name: data.catalog_name || null,
+            catalog_name: null, // Removed from schema
             page_id: data.page_id || null,
-            page_name: data.page_name || null,
-            instagram_actor_id: data.instagram_actor_id || null,
+            page_name: null, // Removed from schema
+            instagram_actor_id: null, // Removed from schema
             access_token: data.access_token || null,
         };
     } catch (err) {
