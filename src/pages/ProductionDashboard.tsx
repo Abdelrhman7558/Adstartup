@@ -82,6 +82,8 @@ export default function ProductionDashboard() {
       .from('meta_connections')
       .select('is_connected')
       .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     setIsMetaConnected(!!data?.is_connected);

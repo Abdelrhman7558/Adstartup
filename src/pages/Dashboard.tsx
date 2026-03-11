@@ -51,6 +51,8 @@ export default function Dashboard() {
           .from('meta_connections')
           .select('is_connected, ad_account_id')
           .eq('user_id', user?.id)
+          .order('updated_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
 
         // We only require is_connected to be true for the UI to reflect a connection.
