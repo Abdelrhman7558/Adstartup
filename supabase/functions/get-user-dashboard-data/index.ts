@@ -128,7 +128,7 @@ Deno.serve(async (req: Request) => {
     const totalConversions = performance.reduce((sum, p) => sum + (p.conversions || 0), 0);
 
     const { data: assetsData } = await supabase
-        .from('use_asset')
+        .from('campaign_assets')
         .select('campaign_id, public_url')
         .eq('user_id', userId)
         .order('uploaded_at', { ascending: false });
@@ -148,7 +148,7 @@ Deno.serve(async (req: Request) => {
       const revenue = perf?.revenue || 0;
       const spend = perf?.spend || 0;
       const roas = spend > 0 ? revenue / spend : 0;
-      const thumbnail = assetMap[campaign.id] || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=400&auto=format&fit=crop';
+      const thumbnail = assetMap[campaign.id] || 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?q=80&w=400&auto=format&fit=crop';
 
       return {
         id: campaign.id,
