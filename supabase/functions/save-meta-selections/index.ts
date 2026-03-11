@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
     if (!payload.ad_account_id) {
       return new Response(
         JSON.stringify({ error: 'Missing required field: ad_account_id' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -79,14 +79,14 @@ Deno.serve(async (req: Request) => {
         console.error('Error fetching brief:', briefError);
         return new Response(
           JSON.stringify({ error: 'Failed to fetch brief' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       if (!fetchedBrief) {
         return new Response(
           JSON.stringify({ error: 'Brief not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -181,7 +181,7 @@ Deno.serve(async (req: Request) => {
       console.error('Error saving to meta_connections:', connectionError);
       return new Response(
         JSON.stringify({ error: 'Failed to save to meta_connections: ' + connectionError.message, details: connectionError }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -192,8 +192,8 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error('Error in save-meta-selections:', error);
     return new Response(
-      JSON.stringify({ error: (error as Error).message || 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: (error as Error).message || 'Internal server error', details: String(error) }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
