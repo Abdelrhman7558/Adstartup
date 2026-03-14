@@ -1,5 +1,6 @@
 // Webhook integration service for dashboard data
 import { validateUserId, webhookGet, webhookPost, logWebhookCall, WebhookValidationError } from './webhookUtils';
+import type { MetaAdsAgentPayload } from './metaAdsAgentService';
 
 const WEBHOOK_BASE = 'https://n8n.srv1181726.hstgr.cloud/webhook';
 
@@ -332,5 +333,69 @@ export async function getTopProfitableCampaigns(userId: string, limit: number = 
       console.error('Error getting top profitable campaigns:', error);
     }
     return [];
+  }
+}
+
+/**
+ * Send campaign payload to the Ad Agent webhook
+ * VALIDATES: user_id must be present in payload
+ */
+export async function sendAdAgentCampaignLaunch(payload: MetaAdsAgentPayload): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  try {
+    const validatedUserId = validateUserId(payload.user_id);
+    const url = 'https://n8n.srv1402143.hstgr.cloud/webhook/ad-agent-campaign-launch';
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, ${errorText}`);
+    }
+
+    let result;
+    const responseText = await response.text();
+    try {
+      result = JSON.parse(responseText);
+    } catch (e) {
+      result = { message: 'Agent webhook sent successfully (non-JSON response)' };
+    }
+
+    logWebhookCall('POST', 'ad-agent-campaign-launch', validatedUserId, true);
+
+    return {
+      success: true,
+      message: result.message || 'Agent webhook sent successfully',
+    };
+  } catch (error: any) {
+    let errorMessage = error.message || 'Failed to send to agent webhook';
+
+    if (error.name === 'AbortError') {
+      errorMessage = 'Agent webhook request timed out after 10 seconds';
+    } else if (error.message === 'Failed to fetch') {
+      errorMessage = 'Network error: Unable to reach agent webhook. Check CORS or connectivity.';
+    }
+
+    console.error('Error sending to agent webhook:', error);
+    logWebhookCall('POST', 'ad-agent-campaign-launch', payload?.user_id || 'MISSING', false, { error: errorMessage });
+    return {
+      success: false,
+      error: errorMessage,
+    };
   }
 }

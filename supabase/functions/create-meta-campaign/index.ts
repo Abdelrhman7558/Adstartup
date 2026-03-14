@@ -604,13 +604,7 @@ Deno.serve(async (req: Request) => {
         try {
             payload = JSON.parse(payloadRaw);
         } catch (e) {
-            const errStr = String(e);
             console.error('[CreateCampaign] Failed to parse JSON payload. Raw snippet:', payloadRaw.substring(0, 200));
-            await supabase.from('meta_account_selections').upsert({
-                user_id: user.id,
-                webhook_response: { error: 'JSON Parse Error', details: errStr, raw: payloadRaw.substring(0, 1000) },
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' });
             return new Response(JSON.stringify({ error: 'Invalid JSON payload' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
@@ -678,16 +672,6 @@ Deno.serve(async (req: Request) => {
             console.log('[CreateCampaign] Token verify result:', JSON.stringify(verifyData));
 
             if (verifyData.error) {
-                await supabase.from('meta_account_selections').upsert({
-                    user_id: user.id,
-                    webhook_response: {
-                        debug_step: 'token_verify',
-                        error: verifyData.error,
-                        timestamp: new Date().toISOString()
-                    },
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id' });
-
                 return new Response(
                     JSON.stringify({ success: false, error: `Access token invalid: ${verifyData.error.message}. Please reconnect your Meta account.` }),
                     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -700,18 +684,6 @@ Deno.serve(async (req: Request) => {
         // ─── Pre-flight: Validate page_id ──────────────────────────
         if (!pageId) {
             console.error('[CreateCampaign] FATAL: pageId is missing.');
-            await supabase.from('meta_account_selections').upsert({
-                user_id: user.id,
-                webhook_response: {
-                    debug_step: 'preflight_validation',
-                    error: 'Missing page_id',
-                    payload_page_id: payload.page_id,
-                    meta_connection_page_id: meta_connection.page_id,
-                    timestamp: new Date().toISOString()
-                },
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' });
-
             return new Response(
                 JSON.stringify({ success: false, error: 'Missing Facebook Page. Please select a Page in Step 5 or reconnect your Meta account.' }),
                 { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -866,17 +838,6 @@ Deno.serve(async (req: Request) => {
 
             const campaignResult = await metaApiPost(`/${adAccountId}/campaigns`, accessToken, campaignParams);
 
-            await supabase.from('meta_account_selections').upsert({
-                user_id: user.id,
-                webhook_response: {
-                    debug_step: 'step1_campaign',
-                    params: campaignParams,
-                    result: campaignResult,
-                    timestamp: new Date().toISOString()
-                },
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' });
-
             if (!campaignResult.success) {
                 throw new Error(`[Step 1 - Campaign] ${campaignResult.error}`);
             }
@@ -1012,18 +973,6 @@ Deno.serve(async (req: Request) => {
                 adSetResult = await metaApiPost(`/${adAccountId}/adsets`, accessToken, adSetParams);
             }
 
-            await supabase.from('meta_account_selections').upsert({
-                user_id: user.id,
-                webhook_response: {
-                    debug_step: 'step2_adset',
-                    params: adSetParams,
-                    result: adSetResult,
-                    fallback_used: metaObjective === 'OUTCOME_TRAFFIC' && payload.objective.toLowerCase() === 'sales',
-                    timestamp: new Date().toISOString()
-                },
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' });
-
             if (!adSetResult.success) {
                 throw new Error(`[Step 2 - AdSet] ${adSetResult.error}`);
             }
@@ -1032,6 +981,9 @@ Deno.serve(async (req: Request) => {
             results.meta_adset_ids = [results.meta_adset_id];
             createdResources.push({ type: 'adset', id: results.meta_adset_id });
             console.log('[CreateCampaign] ✅ AdSet created:', results.meta_adset_id);
+
+            let lastAdError = '';
+
 
             // ─── Step 3: Create Creatives & Ads DIRECTLY via Meta API ──────
             // (No n8n webhook — everything done here)
@@ -1090,6 +1042,7 @@ Deno.serve(async (req: Request) => {
                         console.log(`[CreateCampaign] Creating catalog creative: ${fmt.name}`);
                         const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
                         if (!creativeResult.success) {
+                            lastAdError = creativeResult.error;
                             console.warn(`[CreateCampaign] ⚠️ Creative failed: ${creativeResult.error}. Skipping.`);
                             continue;
                         }
@@ -1106,11 +1059,12 @@ Deno.serve(async (req: Request) => {
                             status: 'PAUSED',
                         };
                         const adResult = await metaApiPost(`/${adAccountId}/ads`, accessToken, adParams);
-                        if (adResult.success) {
+                         if (adResult.success) {
                             results.meta_ad_ids.push(adResult.data.id);
                             createdResources.push({ type: 'ad', id: adResult.data.id });
                             console.log(`[CreateCampaign] ✅ Ad created: ${adResult.data.id}`);
                         } else {
+                            lastAdError = adResult.error;
                             console.warn(`[CreateCampaign] ⚠️ Ad creation failed: ${adResult.error}`);
                         }
                     }
@@ -1138,7 +1092,11 @@ Deno.serve(async (req: Request) => {
                             ...(productSetId ? { product_set_id: productSetId } : {}),
                         };
                         const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
-                        if (!creativeResult.success) { console.warn(`[CreateCampaign] ⚠️ Creative ${i} failed: ${creativeResult.error}`); continue; }
+                        if (!creativeResult.success) { 
+                            lastAdError = creativeResult.error;
+                            console.warn(`[CreateCampaign] ⚠️ Creative ${i} failed: ${creativeResult.error}`); 
+                            continue; 
+                        }
                         const creativeId = creativeResult.data.id;
                         createdResources.push({ type: 'creative', id: creativeId });
 
@@ -1171,7 +1129,11 @@ Deno.serve(async (req: Request) => {
                             ...(productSetId ? { product_set_id: productSetId } : {}),
                         };
                         const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
-                        if (!creativeResult.success) { console.warn(`[CreateCampaign] ⚠️ Isolated creative ${i} failed: ${creativeResult.error}`); continue; }
+                        if (!creativeResult.success) { 
+                            lastAdError = creativeResult.error;
+                            console.warn(`[CreateCampaign] ⚠️ Isolated creative ${i} failed: ${creativeResult.error}`); 
+                            continue; 
+                        }
                         const creativeId = creativeResult.data.id;
                         createdResources.push({ type: 'creative', id: creativeId });
 
@@ -1249,6 +1211,7 @@ Deno.serve(async (req: Request) => {
                                 console.log(`[CreateCampaign] ✅ Flexible ad: ${adResult.data.id}`);
                             }
                         } else {
+                            lastAdError = creativeResult.error;
                             console.warn(`[CreateCampaign] ⚠️ Flexible creative failed: ${creativeResult.error}`);
                         }
                     } else {
@@ -1267,6 +1230,7 @@ Deno.serve(async (req: Request) => {
                             // Upload image and create ad
                             const uploadResult = await uploadImageToMeta(adAccountId, accessToken as string, asset.file_url);
                             if (!uploadResult.success || !uploadResult.imageHash) {
+                                lastAdError = uploadResult.error;
                                 console.warn(`[CreateCampaign] ⚠️ Image upload failed for asset ${i}: ${uploadResult.error}`);
                                 continue;
                             }
@@ -1285,8 +1249,9 @@ Deno.serve(async (req: Request) => {
                                 },
                             };
 
-                            const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
+                             const creativeResult = await metaApiPost(`/${adAccountId}/adcreatives`, accessToken, creativeParams);
                             if (!creativeResult.success) {
+                                lastAdError = creativeResult.error;
                                 console.warn(`[CreateCampaign] ⚠️ Creative ${i} failed: ${creativeResult.error}`);
                                 continue;
                             }
@@ -1297,9 +1262,11 @@ Deno.serve(async (req: Request) => {
                                 name: `${cName} - Ad`, adset_id: results.meta_adset_id,
                                 creative: { creative_id: creativeId }, status: 'PAUSED',
                             });
-                            if (adResult.success) {
+                             if (adResult.success) {
                                 results.meta_ad_ids.push(adResult.data.id);
                                 createdResources.push({ type: 'ad', id: adResult.data.id });
+                            } else {
+                                lastAdError = adResult.error;
                             }
                         }
                         // Video assets: would require advideos upload — skipped for now
@@ -1307,11 +1274,12 @@ Deno.serve(async (req: Request) => {
                 }
             }
 
+            // Strategy.is_catalog check remains...
+
             console.log(`[CreateCampaign] Step 3 complete — Created ${results.meta_ad_ids.length} ad(s) directly.`);
 
             if (results.meta_ad_ids.length === 0) {
-                // If we failed to create any ads, we should throw an error to surface it to the user.
-                throw new Error(`Failed to create Ad Creatives. The Campaign and AdSet were created, but Ads failed due to Meta limitations or missing permissions. Please verify your Facebook Page and Instagram Account connection, and verify Catalog permissions.`);
+                throw new Error(`Failed to create Ad Creatives. Meta Error: ${lastAdError || 'Unknown creative failure'}. Please verify your Page/Instagram connection.`);
             }
 
             // ─── Step 4: Update local DB with Meta IDs ──────────
@@ -1357,19 +1325,6 @@ Deno.serve(async (req: Request) => {
             results.success = true;
             results.message = `Campaign, AdSet, and ${results.meta_ad_ids.length} Ad(s) created successfully on Meta!`;
 
-            // Save final success debug data
-            await supabase.from('meta_account_selections').upsert({
-                user_id: user.id,
-                webhook_response: {
-                    debug_step: 'SUCCESS',
-                    results: results,
-                    ads_created_directly: true,
-                    total_ads: results.meta_ad_ids.length,
-                    timestamp: new Date().toISOString()
-                },
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' });
-
             console.log('[CreateCampaign] ✅ FULL campaign created successfully!', results);
 
             return new Response(
@@ -1385,18 +1340,6 @@ Deno.serve(async (req: Request) => {
         } catch (error: any) {
             console.error('[CreateCampaign] Fatal error:', error.message);
             await cleanupResources();
-
-            // Save error debug data
-            await supabase.from('meta_account_selections').upsert({
-                user_id: user.id,
-                webhook_response: {
-                    debug_step: 'FATAL_ERROR',
-                    error: error.message,
-                    created_resources: createdResources,
-                    timestamp: new Date().toISOString()
-                },
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' });
 
             return new Response(
                 JSON.stringify({ success: false, error: error.message || 'Internal server error' }),

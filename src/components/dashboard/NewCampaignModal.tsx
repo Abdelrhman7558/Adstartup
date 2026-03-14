@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { campaignAssetsService } from '../../lib/campaignAssetsService';
-import { sendCampaignIdWebhook } from '../../lib/webhookService';
+import { sendCampaignIdWebhook, sendAdAgentCampaignLaunch } from '../../lib/webhookService';
 import { buildAgentPayload, createMetaCampaign, CampaignFormData } from '../../lib/metaAdsAgentService';
 import { isManagerPlanUser } from '../../lib/managerPlanService';
 
@@ -590,6 +590,12 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
       }
 
       console.log('Campaign created on Meta:', agentResult.data);
+
+      setStatusMessage('Sending campaign launch webhook...');
+      const launchWebhookResult = await sendAdAgentCampaignLaunch(agentPayload);
+      if (!launchWebhookResult.success) {
+        console.warn('Failed to send campaign launch webhook:', launchWebhookResult.error);
+      }
 
       setStatusMessage('Done!');
       resetForm();
