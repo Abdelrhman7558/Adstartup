@@ -37,7 +37,7 @@ export default function ConnectMetaButton({
       // This replaces the old n8n flow and handles token exchange securely
       const redirectUri = `https://avzyuhhbmzhxqksnficn.supabase.co/functions/v1/meta-oauth-callback`;
 
-      const scope = encodeURIComponent('ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management,pages_show_list,pages_manage_posts');
+      const scope = encodeURIComponent('ads_management,ads_read,business_management,pages_manage_ads,pages_read_engagement,catalog_management,pages_show_list');
 
       // Create a state string with userId, timestamp and origin for dynamic redirect
       const stateContent = `${validatedUserId}:${Date.now()}:${window.location.origin}`;
