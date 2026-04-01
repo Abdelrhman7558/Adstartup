@@ -137,6 +137,7 @@ export interface MetaAdsAgentPayload {
     account_id: string | null;
     account_name: string | null;
     agent_mode: 'TEST_MODE' | 'OPTIMIZE_MODE' | 'SCALE_MODE' | 'HOLD_MODE';
+    optimization_enabled: boolean;
     timestamp: string;
 }
 
@@ -388,6 +389,7 @@ export async function buildAgentPayload(
 
             // Agent control
             agent_mode: 'TEST_MODE',
+            optimization_enabled: campaignForm.optimization_enabled || false,
             timestamp: new Date().toISOString(),
         };
 
