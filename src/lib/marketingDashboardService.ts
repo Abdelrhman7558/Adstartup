@@ -16,6 +16,7 @@ export interface MarketingCampaign {
   date_stop?: string;
   top_country?: string;
   top_audience_segment?: string;
+  optimization_enabled?: boolean;
 }
 
 export interface MarketingAd {

@@ -43,6 +43,21 @@ export default function MarketingDashboard() {
     }
   };
 
+  const handleToggleOptimization = async (campaignId: string, enabled: boolean) => {
+    if (!user) return;
+    try {
+      // Optimistic UI update
+      setCampaigns(prev => prev.map(c => c.campaign_id === campaignId ? { ...c, optimization_enabled: enabled } : c));
+      setTopCampaigns(prev => prev.map(c => c.campaign_id === campaignId ? { ...c, optimization_enabled: enabled } : c));
+      
+      await marketingDashboardService.updateCampaign(user.id, campaignId, { optimization_enabled: enabled });
+    } catch (error) {
+      console.error('Error updating optimization status:', error);
+      // Revert upon failure
+      loadDashboardData();
+    }
+  };
+
   const StatCard = ({ label, value, icon: Icon, unit = '' }: { label: string; value: number | string; icon: any; unit?: string }) => (
     <div className={`p-6 rounded-xl border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
       <div className="flex items-start justify-between">
@@ -120,6 +135,7 @@ export default function MarketingDashboard() {
               <tr className={`border-b ${theme === 'dark' ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                 <th className={`px-6 py-3 text-left text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Campaign Name</th>
                 <th className={`px-6 py-3 text-left text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Status</th>
+                <th className={`px-6 py-3 text-center text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Automation</th>
                 <th className={`px-6 py-3 text-right text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Spend</th>
                 <th className={`px-6 py-3 text-right text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Revenue</th>
                 <th className={`px-6 py-3 text-right text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>ROAS</th>
@@ -146,6 +162,21 @@ export default function MarketingDashboard() {
                     }`}>
                       {campaign.status}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => handleToggleOptimization(campaign.campaign_id, !campaign.optimization_enabled)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        campaign.optimization_enabled ? 'bg-blue-600' : (theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300')
+                      }`}
+                      title={campaign.optimization_enabled ? 'Disable AI Optimization' : 'Enable AI Optimization'}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          campaign.optimization_enabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
                   </td>
                   <td className={`px-6 py-4 text-right font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>${campaign.spend.toFixed(2)}</td>
                   <td className={`px-6 py-4 text-right font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>${campaign.revenue.toFixed(2)}</td>
@@ -191,6 +222,7 @@ export default function MarketingDashboard() {
                 <tr className={`border-b ${theme === 'dark' ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                   <th className={`px-6 py-3 text-left text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Campaign</th>
                   <th className={`px-6 py-3 text-left text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Objective</th>
+                  <th className={`px-6 py-3 text-center text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Automation</th>
                   <th className={`px-6 py-3 text-right text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Impressions</th>
                   <th className={`px-6 py-3 text-right text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>Clicks</th>
                   <th className={`px-6 py-3 text-right text-sm font-semibold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>CTR</th>
@@ -204,6 +236,21 @@ export default function MarketingDashboard() {
                   <tr key={campaign.campaign_id} className={`border-b last:border-b-0 ${theme === 'dark' ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'}`}>
                     <td className={`px-6 py-4 font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{campaign.campaign_name}</td>
                     <td className={`px-6 py-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{campaign.objective || '-'}</td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        onClick={() => handleToggleOptimization(campaign.campaign_id, !campaign.optimization_enabled)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          campaign.optimization_enabled ? 'bg-blue-600' : (theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300')
+                        }`}
+                        title={campaign.optimization_enabled ? 'Disable AI Optimization' : 'Enable AI Optimization'}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            campaign.optimization_enabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </td>
                     <td className={`px-6 py-4 text-right ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{campaign.impressions.toFixed(0)}</td>
                     <td className={`px-6 py-4 text-right ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{campaign.clicks.toFixed(0)}</td>
                     <td className={`px-6 py-4 text-right ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{campaign.ctr.toFixed(2)}%</td>

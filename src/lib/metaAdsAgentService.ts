@@ -109,6 +109,7 @@ export interface CampaignFormData {
     selected_instagram_id?: string;
     account_id?: string;
     account_name?: string;
+    optimization_enabled?: boolean;
 }
 
 export interface MetaAdsAgentPayload {

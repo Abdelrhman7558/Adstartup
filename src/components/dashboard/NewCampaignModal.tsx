@@ -70,6 +70,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
   const [offer, setOffer] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [optimizationEnabled, setOptimizationEnabled] = useState(false);
 
   const [selectedPageId, setSelectedPageId] = useState('');
   const [selectedPageName, setSelectedPageName] = useState('');
@@ -145,6 +146,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
     setPixels([]);
     setSelectedPixelId('');
     setSelectedPixelName('');
+    setOptimizationEnabled(false);
   };
 
   const loadManagerAccounts = async () => {
@@ -481,6 +483,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
             end_datetime: endTime || null,
             page_id: selectedPageId,
             page_name: selectedPageName,
+            optimization_enabled: optimizationEnabled,
           },
         ])
         .select()
@@ -566,6 +569,7 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
         account_name: isManagerPlanUser(user.email) && selectedAccountName ? selectedAccountName : undefined,
         selected_pixel_id: selectedPixelId || undefined,
         selected_pixel_name: selectedPixelName || undefined,
+        optimization_enabled: optimizationEnabled,
       };
 
       // Build the full agent payload (pulls meta_connections, client_briefs, assets from DB)
@@ -981,6 +985,30 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
                   placeholder="Enter offer details (optional)"
                 />
               </div>
+
+              <div className={`flex items-center justify-between p-4 border rounded-xl ${theme === 'dark' ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'}`}>
+                <div>
+                  <h4 className={`font-semibold ${theme === 'dark' ? 'text-blue-300' : 'text-blue-900'}`}>
+                    Enable AI Optimization & Scaling
+                  </h4>
+                  <p className={`text-sm mt-1 sm:max-w-md ${theme === 'dark' ? 'text-blue-400/80' : 'text-blue-700/80'}`}>
+                    Let our automated engine optimize budgets and scale winning campaigns based on AI analysis.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOptimizationEnabled(!optimizationEnabled)}
+                  className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors ${
+                    optimizationEnabled ? 'bg-blue-600' : (theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300')
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                      optimizationEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           )}
 
@@ -1268,6 +1296,15 @@ export default function NewCampaignModal({ isOpen, onClose, onSuccess }: NewCamp
                   </p>
                   <p className={`text-base ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                     {selectedInstagramName || 'None (Default to Page / Facebook Only)'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                    AI Optimization & Scaling
+                  </p>
+                  <p className={`text-base font-semibold ${optimizationEnabled ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}>
+                    {optimizationEnabled ? 'Enabled' : 'Disabled'}
                   </p>
                 </div>
               </div>
