@@ -1,0 +1,102 @@
+import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
+};
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing Authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authorization token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Try meta_connections first
+    const { data: metaConnections, error: metaError } = await supabase
+      .from('meta_connections')
+      .select('access_token')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    const metaConnection = metaConnections?.[0];
+    let accessToken = metaConnection?.access_token;
+
+    // Fallback: check meta_account_selections (token stored after OAuth)
+    if (!accessToken) {
+      const { data: metaSelections } = await supabase
+        .from('meta_account_selections')
+        .select('access_token')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      accessToken = metaSelections?.[0]?.access_token;
+    }
+
+    if (!accessToken) {
+      return new Response(
+        JSON.stringify({ error: 'No Meta connection found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let allAccounts: any[] = [];
+    let url: string | null = `https://graph.facebook.com/v18.0/me/adaccounts?access_token=${accessToken}&fields=id,name,account_status,currency&limit=100`;
+
+    while (url) {
+      const metaResponse = await fetch(url);
+
+      if (!metaResponse.ok) {
+        const errorData = await metaResponse.json();
+        return new Response(
+          JSON.stringify({ error: errorData.error?.message || 'Failed to fetch ad accounts' }),
+          { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const metaData = await metaResponse.json();
+      if (metaData.data && Array.isArray(metaData.data)) {
+        allAccounts = allAccounts.concat(metaData.data);
+      }
+
+      url = metaData.paging?.next || null;
+    }
+
+    return new Response(
+      JSON.stringify({ data: allAccounts }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error: any) {
+    console.error('Error in get-ad-accounts:', error);
+    return new Response(
+      JSON.stringify({ error: error.message || 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});

@@ -1,0 +1,197 @@
+import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
+};
+
+interface SelectionPayload {
+  user_id?: string;
+  brief_id?: string;
+  page_id?: string;
+  page_name?: string;
+  instagram_actor_id?: string;
+  instagram_actor_name?: string;
+  ad_account_id: string;
+  ad_account_name: string;
+  pixel_id?: string;
+  pixel_name?: string;
+  catalog_id?: string;
+  catalog_name?: string;
+  is_manager_connection?: boolean;
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing Authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authorization token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const payload: SelectionPayload = await req.json();
+    const targetUserId = payload.user_id || user.id;
+
+    if (!payload.ad_account_id) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required field: ad_account_id' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let briefData = null;
+
+
+    // Only fetch brief if brief_id is provided
+    if (payload.brief_id) {
+      const { data: fetchedBrief, error: briefError } = await supabase
+        .from('client_briefs')
+        .select('*')
+        .eq('id', payload.brief_id)
+        .eq('user_id', targetUserId)
+        .maybeSingle();
+
+      if (briefError) {
+        console.error('Error fetching brief:', briefError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch brief' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!fetchedBrief) {
+        return new Response(
+          JSON.stringify({ error: 'Brief not found' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      briefData = fetchedBrief;
+    }
+
+    // MANAGER PLAN LOGIC: If this is a manager adding an extra account
+    if (payload.is_manager_connection) {
+      // 1. Fetch the access_token from the meta_connections table (where callback saved it)
+      const { data: existingConnData, error: fetchError } = await supabase
+        .from('meta_connections')
+        .select('access_token')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      let activeAccessToken = existingConnData?.access_token;
+
+      if (fetchError || !activeAccessToken) {
+        console.error('Error fetching access token for manager connection:', fetchError);
+        // Table meta_account_selections doesn't exist. Can't fallback.
+      }
+
+      if (activeAccessToken) {
+        // 2. Insert into manager_meta_accounts
+        const { error: managerInsertError } = await supabase
+          .from('manager_meta_accounts')
+          .insert({
+            user_id: user.id,
+            account_id: payload.ad_account_id,
+            account_name: payload.ad_account_name,
+            access_token: activeAccessToken
+          });
+
+        if (managerInsertError) {
+          console.error('Error saving to manager_meta_accounts:', managerInsertError);
+        }
+      }
+    }
+
+    const insertSelectionPayload: any = {
+      user_id: targetUserId,
+      brief_id: payload.brief_id || null,
+      page_id: payload.page_id || null,
+      page_name: payload.page_name || null,
+      instagram_actor_id: payload.instagram_actor_id || null,
+      instagram_actor_name: payload.instagram_actor_name || null,
+      ad_account_id: payload.ad_account_id,
+      ad_account_name: payload.ad_account_name,
+      pixel_id: payload.pixel_id || null,
+      pixel_name: payload.pixel_name || null,
+      catalog_id: payload.catalog_id || null,
+      catalog_name: payload.catalog_name || null,
+      selection_completed: true,
+      updated_at: new Date().toISOString(),
+    };
+
+      // SKIP meta_account_selections: The table does not exist in production (PGRST205).
+      // We rely solely on meta_connections for storing this.
+
+    const metaConnectionData = {
+      user_id: targetUserId,
+      ad_account_id: payload.ad_account_id,
+      pixel_id: payload.pixel_id || null,
+      page_id: payload.page_id || null,
+      catalog_id: payload.catalog_id || null,
+      is_connected: true,
+      updated_at: new Date().toISOString(),
+    };
+
+    // 2. Update the meta_connections table (Safe Update or Insert)
+    let { data: connectionData, error: connectionError } = await supabase
+      .from('meta_connections')
+      .update(metaConnectionData)
+      .eq('user_id', targetUserId)
+      .select();
+
+    let finalConnectionData = connectionData && connectionData.length > 0 ? connectionData[0] : null;
+
+    if (!finalConnectionData && !connectionError) {
+       const connInsertRes = await supabase
+        .from('meta_connections')
+        .insert(metaConnectionData)
+        .select()
+        .maybeSingle();
+       finalConnectionData = connInsertRes.data;
+       connectionError = connInsertRes.error;
+    }
+
+    if (connectionError) {
+      console.error('Error saving to meta_connections:', connectionError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to save to meta_connections: ' + connectionError.message, details: connectionError }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, data: finalConnectionData }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Error in save-meta-selections:', error);
+    return new Response(
+      JSON.stringify({ error: (error as Error).message || 'Internal server error', details: String(error) }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
