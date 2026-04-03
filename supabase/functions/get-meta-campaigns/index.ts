@@ -33,10 +33,18 @@ Deno.serve(async (req) => {
         const supabase = createClient(supabaseUrl, supabaseKey);
 
         // 1. Get ALL Meta Connection Details for User (supports multiple ad accounts)
-        const { data: connections, error: connError } = await supabase
-            .from('meta_connections')
-            .select('access_token, ad_account_id')
-            .eq('user_id', userId);
+        const [connectionsResult, accountNamesResult] = await Promise.all([
+            supabase
+                .from('meta_connections')
+                .select('access_token, ad_account_id')
+                .eq('user_id', userId),
+            supabase
+                .from('manager_meta_accounts')
+                .select('account_id, account_name')
+                .eq('user_id', userId)
+        ]);
+
+        const { data: connections, error: connError } = connectionsResult;
 
         if (connError || !connections || connections.length === 0) {
             console.error("[get-meta-campaigns] User Meta connections missing:", connError?.message);
@@ -49,6 +57,15 @@ Deno.serve(async (req) => {
                 status: 200,
             });
         }
+
+        // Build account name lookup map from manager_meta_accounts
+        const accountNameMap: Record<string, string> = {};
+        (accountNamesResult.data || []).forEach((a: any) => {
+            // account_id in manager_meta_accounts may or may not have act_ prefix
+            const normalized = a.account_id.startsWith('act_') ? a.account_id : `act_${a.account_id}`;
+            accountNameMap[normalized] = a.account_name;
+            accountNameMap[a.account_id] = a.account_name; // also store without prefix
+        });
 
         // Filter to only valid connections with both token and account ID
         const validConnections = connections.filter((c: any) => c.access_token && c.ad_account_id);
@@ -71,8 +88,19 @@ Deno.serve(async (req) => {
                 const accessToken = conn.access_token;
                 const adAccountId = conn.ad_account_id;
 
-                // Fetch campaigns with insights and ad creative thumbnails
-                const url = `https://graph.facebook.com/v19.0/${adAccountId}/campaigns?fields=id,name,status,objective,insights{impressions,clicks,spend,actions,action_values,purchase_roas},ads.limit(1){creative{thumbnail_url,object_story_spec{link_data{image_hash,picture},video_data{video_id}}}}&limit=1000&access_token=${accessToken}`;
+                // Fetch campaigns with insights (last 30 days), adset daily_budget, and ad creative thumbnails
+                const fields = [
+                    'id',
+                    'name',
+                    'status',
+                    'objective',
+                    'start_time',
+                    'insights.date_preset(last_30d){impressions,clicks,spend,actions,action_values,purchase_roas,date_start,date_stop}',
+                    'adsets.limit(1){daily_budget,lifetime_budget,start_time}',
+                    'ads.limit(1){creative{thumbnail_url,object_story_spec{link_data{image_hash,picture},video_data{video_id}}}}'
+                ].join(',');
+
+                const url = `https://graph.facebook.com/v21.0/${adAccountId}/campaigns?fields=${encodeURIComponent(fields)}&limit=1000&access_token=${accessToken}`;
 
                 console.log(`[get-meta-campaigns] Fetching from Meta for account ${adAccountId}...`);
                 const metaRes = await fetch(url);
@@ -82,6 +110,11 @@ Deno.serve(async (req) => {
                     console.error(`[get-meta-campaigns] Meta API error for ${adAccountId}:`, metaData.error?.message);
                     return [];
                 }
+
+                // Determine account name
+                const accountName = accountNameMap[adAccountId]
+                    || accountNameMap[adAccountId.replace('act_', '')]
+                    || adAccountId;
 
                 return (metaData.data || []).map((campaign: any) => {
                     const insight = campaign.insights?.data?.[0] || {};
@@ -105,6 +138,22 @@ Deno.serve(async (req) => {
                     );
                     const cpa = purchases > 0 ? spend / purchases : 0;
 
+                    // Extract daily budget from first adset (Meta returns in cents)
+                    const adset = campaign.adsets?.data?.[0];
+                    const dailyBudgetCents = Number(adset?.daily_budget || 0);
+                    const lifetimeBudgetCents = Number(adset?.lifetime_budget || 0);
+                    // Meta returns budget in cents (integer), divide by 100 for dollars
+                    const daily_budget = dailyBudgetCents > 0 ? dailyBudgetCents / 100 : (lifetimeBudgetCents > 0 ? lifetimeBudgetCents / 100 : 0);
+
+                    // Calculate runtime in days (from campaign start_time to today)
+                    const startTime = campaign.start_time || insight.date_start || null;
+                    let runtime: number | null = null;
+                    if (startTime) {
+                        const startMs = new Date(startTime).getTime();
+                        const nowMs = Date.now();
+                        runtime = Math.max(0, Math.floor((nowMs - startMs) / (1000 * 60 * 60 * 24)));
+                    }
+
                     // Extract thumbnail from the first ad's creative
                     const firstAd = campaign.ads?.data?.[0];
                     const creative = firstAd?.creative;
@@ -118,7 +167,8 @@ Deno.serve(async (req) => {
                         name: campaign.name,
                         id: campaign.id,
                         status: campaign.status?.toLowerCase() || null,
-                        budget: spend,
+                        daily_budget,
+                        budget: daily_budget,
                         spend: Number(spend.toFixed(2)),
                         revenue: Number(revenue.toFixed(2)),
                         roas: Number(roas.toFixed(2)),
@@ -127,12 +177,14 @@ Deno.serve(async (req) => {
                         ctr: Number(ctr.toFixed(2)),
                         cpc: Number(cpc.toFixed(2)),
                         cpa: Number(cpa.toFixed(2)),
+                        runtime,
                         date_start: insight.date_start || null,
                         date_stop: insight.date_stop || null,
                         start_date: insight.date_start || null,
                         end_date: insight.date_stop || null,
-                        thumbnail: thumbnail,
-                        ad_account_id: adAccountId
+                        thumbnail,
+                        ad_account_id: adAccountId,
+                        account_name: accountName,
                     };
                 });
             } catch (err) {
@@ -144,21 +196,14 @@ Deno.serve(async (req) => {
         const results = await Promise.all(fetchPromises);
         results.forEach((campaigns: any[]) => allCampaigns.push(...campaigns));
 
-        // 4. Generate the 3 specific views needed by frontend
-
-        // Recent / All Campaigns (just the same transformed list)
+        // Generate the 3 specific views needed by frontend
         const recent_campaigns = allCampaigns;
-
-        // Active Campaigns
         const active_campaigns = allCampaigns.filter((c: any) => c.status === 'active');
-
-        // Top 5 Campaigns (Sorted by Spend DESC)
         const top_5_campaigns = [...allCampaigns]
             .sort((a: any, b: any) => b.spend - a.spend)
             .slice(0, 5);
 
-        // [Optional] Sync to our new local database tables (fire and forget to keep request fast)
-        // We do this asynchronously so it doesn't block returning the HTTP response
+        // Async sync to local database (fire and forget)
         (async () => {
             try {
                 const campaignInserts = allCampaigns.map((c: any) => ({

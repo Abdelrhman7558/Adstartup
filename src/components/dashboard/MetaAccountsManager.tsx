@@ -87,28 +87,27 @@ export default function MetaAccountsManager({ isOpen, onClose }: MetaAccountsMan
             setError(null);
             setShowAvailable(true);
 
-            const validatedUserId = validateUserId(user.id);
+            // Get auth token for edge function call
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData?.session?.access_token;
+            if (!token) throw new Error('Not authenticated');
 
-            // Call n8n webhook to get fresh list from Meta
-            const response = await fetch('https://n8n.srv1181726.hstgr.cloud/webhook/meta-ad-accounts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: validatedUserId }),
+            const { data, error: fnError } = await supabase.functions.invoke('get-ad-accounts', {
+                headers: { Authorization: `Bearer ${token}` },
             });
 
-            if (!response.ok) throw new Error('Failed to fetch accounts from Meta');
+            if (fnError) throw fnError;
 
-            const result = await response.json();
-            const data = Array.isArray(result) ? result[0] : result;
-
-            const accounts = Array.isArray(data.ad_accounts) ? data.ad_accounts : [];
+            const accounts: AvailableAccount[] = (data?.data || []).map((acc: any) => ({
+                id: acc.id,
+                name: acc.name,
+                currency: acc.currency,
+                account_status: acc.account_status,
+            }));
             setAvailableAccounts(accounts);
-
-            logWebhookCall('POST', 'meta-ad-accounts', validatedUserId, true);
         } catch (err: any) {
             console.error('Error fetching available accounts:', err);
             setError('Failed to fetch accounts from Meta. Please check your connection.');
-            logWebhookCall('POST', 'meta-ad-accounts', user?.id || 'unknown', false, { error: String(err) });
         } finally {
             setLoadingAvailable(false);
         }

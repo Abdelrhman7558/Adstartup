@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
 
         const fetchPromises = validConnections.map(async (conn: any) => {
             try {
-                const url = `https://graph.facebook.com/v19.0/${conn.ad_account_id}/insights?fields=campaign_id,campaign_name,impressions,clicks,spend,ctr,cpm,cpc,reach,frequency,action_values,purchase_roas,date_start&level=campaign&limit=100&date_preset=last_30d&access_token=${conn.access_token}`;
+                const url = `https://graph.facebook.com/v21.0/${conn.ad_account_id}/insights?fields=campaign_id,campaign_name,impressions,clicks,spend,ctr,cpc,reach,actions,action_values,purchase_roas,date_start&level=campaign&limit=200&date_preset=last_30d&access_token=${conn.access_token}`;
 
                 console.log(`[get-meta-insights] Fetching from Meta for account ${conn.ad_account_id}...`);
                 const metaRes = await fetch(url);
@@ -155,11 +155,19 @@ Deno.serve(async (req) => {
         const campaign_performance = campaignActionMap;
 
         // --- weekly_trend ---
-        const weekly_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-        const weekly_trend = weekly_days.map((day, index) => ({
-            day: day,
-            value: activity_grid[index] ? activity_grid[index].count : 0
-        }));
+        // Aggregate clicks by day of week from actual data
+        const dayClickMap: Record<string, number> = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+        const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        activity_grid.forEach((item: any) => {
+            if (item.date) {
+                const d = new Date(item.date);
+                const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+                if (dayClickMap[dayName] !== undefined) {
+                    dayClickMap[dayName] += item.count;
+                }
+            }
+        });
+        const weekly_trend = dayOrder.map(day => ({ day, value: dayClickMap[day] }));
 
         // Construct final matching payload
         return new Response(JSON.stringify({
