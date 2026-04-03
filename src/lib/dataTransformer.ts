@@ -30,6 +30,12 @@ export interface RecentCampaign {
   status: string;
   revenue?: number;
   spend?: number;
+  roas?: number;
+  impressions?: number;
+  clicks?: number;
+  ctr?: number;
+  cpc?: number;
+  cpa?: number;
   date_start?: string;
   date_stop?: string;
   created_at?: string;
@@ -117,6 +123,12 @@ export function transformDashboardData(data: any): DashboardData {
     status: c.status || 'unknown',
     revenue: safeNumber(c.revenue || c.total_revenue),
     spend: safeNumber(c.spend || c.total_spend),
+    roas: safeNumber(c.roas),
+    impressions: safeNumber(c.impressions),
+    clicks: safeNumber(c.clicks),
+    ctr: safeNumber(c.ctr),
+    cpc: safeNumber(c.cpc),
+    cpa: safeNumber(c.cpa),
     date_start: c.start_time || c.start_date || c.date_start || null,
     date_stop: c.end_time || c.end_date || c.stop_time || c.date_stop || null,
     created_at: c.created_at || new Date().toISOString(),
