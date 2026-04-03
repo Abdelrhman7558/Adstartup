@@ -173,17 +173,17 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                 </button>
             </div>
             
-            <div className="overflow-x-auto bg-white rounded-2xl border border-gray-100 shadow-sm">
-                <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto bg-white rounded-2xl border border-gray-100 shadow-sm w-full">
+                <table className="w-full text-left border-collapse whitespace-nowrap">
                     <thead className="bg-gray-50/80 text-gray-500 text-[11px] uppercase tracking-wider font-bold border-b border-gray-100">
                         <tr>
-                            <th className="px-6 py-4">ID</th>
-                            <th className="px-6 py-4">Name</th>
-                            <th className="px-6 py-4 text-right">Daily Budget</th>
-                            <th className="px-6 py-4">Start Time</th>
-                            <th className="px-6 py-4">End Time</th>
-                            <th className="px-6 py-4 text-center">ROAS</th>
-                            <th className="px-6 py-4 text-center">Optimize & Scale</th>
+                            <th className="px-4 py-4">ID</th>
+                            <th className="px-4 py-4 w-full">Name</th>
+                            <th className="px-4 py-4 text-right">Daily Budget</th>
+                            <th className="px-4 py-4 text-center">Start Time</th>
+                            <th className="px-4 py-4 text-center">End Time</th>
+                            <th className="px-4 py-4 text-center">ROAS</th>
+                            <th className="px-4 py-4 text-center">Optimize</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -193,37 +193,37 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                                 onClick={() => setSelectedCampaign(campaign)}
                                 className="hover:bg-red-50/40 transition-colors cursor-pointer group"
                             >
-                                <td className="px-6 py-4 text-sm font-medium text-gray-500 font-mono">
+                                <td className="px-4 py-4 text-sm font-medium text-gray-500 font-mono">
                                     {campaign.campaign_id.slice(-6)}
                                 </td>
-                                <td className="px-6 py-4 text-sm font-bold text-gray-900 group-hover:text-red-600 transition-colors">
+                                <td className="px-4 py-4 text-sm font-bold text-gray-900 group-hover:text-red-600 transition-colors max-w-[200px] truncate">
                                     {campaign.campaign_name}
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-700 text-right font-semibold">
+                                <td className="px-4 py-4 text-sm text-gray-700 text-right font-semibold">
                                     ${(campaign.spend || 0).toFixed(2)}
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-600 font-medium">
+                                <td className="px-4 py-4 text-sm text-gray-600 font-medium text-center">
                                     {campaign.date_start ? new Date(campaign.date_start).toLocaleDateString() : '—'}
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-600 font-medium">
+                                <td className="px-4 py-4 text-sm text-gray-600 font-medium text-center">
                                     {campaign.date_stop ? new Date(campaign.date_stop).toLocaleDateString() : 'Ongoing'}
                                 </td>
-                                <td className="px-6 py-4 text-center">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                <td className="px-4 py-4 text-center">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                                         campaign.roas >= 2 ? 'bg-green-100 text-green-700' : 
                                         campaign.roas > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'
                                     }`}>
                                         {campaign.roas.toFixed(2)}x
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
                                     <button 
                                         onClick={(e) => handleToggleOptimization(campaign.campaign_id, !!campaign.optimization_enabled, e)}
                                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                                             campaign.optimization_enabled ? 'bg-blue-600' : 'bg-gray-300'
                                         }`}
                                     >
-                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
                                             campaign.optimization_enabled ? 'translate-x-6' : 'translate-x-1'
                                         }`} />
                                     </button>

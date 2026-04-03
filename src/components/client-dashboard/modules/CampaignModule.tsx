@@ -69,11 +69,11 @@ export default function CampaignModule() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 w-full">
-                <div className="xl:col-span-2 space-y-6">
+            <div className="flex flex-col xl:flex-row gap-6 w-full">
+                <div className="flex-1 min-w-0 space-y-6">
                     <CampaignsTable onActionCompleted={handleActionCompleted} />
                 </div>
-                <div className="xl:col-span-1 h-[600px] xl:h-auto">
+                <div className="w-full xl:w-[340px] shrink-0 h-[600px] xl:h-auto">
                     <OptimizationLogs logs={logs} />
                 </div>
             </div>
