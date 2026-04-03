@@ -32,15 +32,14 @@ Deno.serve(async (req) => {
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
         const supabase = createClient(supabaseUrl, supabaseKey);
 
-        // 1. Get Meta Connection Details for User
-        const { data: connection, error: connError } = await supabase
+        // 1. Get ALL Meta Connection Details for User
+        const { data: connections, error: connError } = await supabase
             .from('meta_connections')
             .select('access_token, ad_account_id')
-            .eq('user_id', userId)
-            .single();
+            .eq('user_id', userId);
 
-        if (connError || !connection || !connection.access_token || !connection.ad_account_id) {
-            console.error("[get-meta-insights] User Meta connection missing:", connError?.message);
+        if (connError || !connections || connections.length === 0) {
+            console.error("[get-meta-insights] User Meta connections missing:", connError?.message);
             return new Response(JSON.stringify({
                 insights: {
                     summary_cards: [],
@@ -50,25 +49,48 @@ Deno.serve(async (req) => {
                 }
             }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200, // Return 200 with empty to not crash frontend
+                status: 200,
             });
         }
 
-        const accessToken = connection.access_token;
-        const adAccountId = connection.ad_account_id;
-
-        // 2. Fetch Data from Meta Graph API
-        const url = `https://graph.facebook.com/v19.0/${adAccountId}/insights?fields=campaign_id,campaign_name,impressions,clicks,spend,ctr,cpm,cpc,reach,frequency,action_values,purchase_roas,date_start&level=campaign&limit=100&date_preset=last_30d&access_token=${accessToken}`;
-
-        console.log("[get-meta-insights] Fetching from Meta...");
-        const metaRes = await fetch(url);
-        const metaData = await metaRes.json();
-
-        if (!metaRes.ok) {
-            throw new Error(metaData.error?.message || "Failed to fetch from Meta Graph API");
+        const validConnections = connections.filter((c: any) => c.access_token && c.ad_account_id);
+        if (validConnections.length === 0) {
+            return new Response(JSON.stringify({
+                insights: { summary_cards: [], activity_grid: [], campaign_performance: [], weekly_trend: [] }
+            }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200,
+            });
         }
 
-        const data = metaData.data || [];
+        // 2. Fetch insights from ALL connected ad accounts in parallel
+        const allInsightsData: any[] = [];
+
+        const fetchPromises = validConnections.map(async (conn: any) => {
+            try {
+                const url = `https://graph.facebook.com/v19.0/${conn.ad_account_id}/insights?fields=campaign_id,campaign_name,impressions,clicks,spend,ctr,cpm,cpc,reach,frequency,action_values,purchase_roas,date_start&level=campaign&limit=100&date_preset=last_30d&access_token=${conn.access_token}`;
+
+                console.log(`[get-meta-insights] Fetching from Meta for account ${conn.ad_account_id}...`);
+                const metaRes = await fetch(url);
+                const metaData = await metaRes.json();
+
+                if (!metaRes.ok) {
+                    console.error(`[get-meta-insights] Meta API error for ${conn.ad_account_id}:`, metaData.error?.message);
+                    return [];
+                }
+
+                return metaData.data || [];
+            } catch (err) {
+                console.error(`[get-meta-insights] Error fetching account ${conn.ad_account_id}:`, err);
+                return [];
+            }
+        });
+
+        const results = await Promise.all(fetchPromises);
+        results.forEach((items: any[]) => allInsightsData.push(...items));
+
+        const data = allInsightsData;
+
 
         // 3. Transform Data EXACTLY like the n8n Insights Javascript Node did
         let totalRevenue = 0;

@@ -36,7 +36,7 @@ export function useCampaignsAgent() {
                 name: c.name,
                 platform: 'facebook',
                 status: mapMetaStatusToNormalized(c.status),
-                thumbnail: c.thumbnail || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=400&auto=format&fit=crop',
+                thumbnail: c.thumbnail || `https://placehold.co/400x600/1a1a2e/e94560?text=${encodeURIComponent(c.name?.substring(0, 12) || 'Campaign')}`,
                 spend: c.spend || 0,
                 impressions: (c as any).impressions || 0,
                 clicks: (c as any).clicks || 0,
