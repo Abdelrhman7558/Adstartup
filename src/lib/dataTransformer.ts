@@ -12,6 +12,8 @@ export interface Campaign {
   cpa?: number;
   date_start?: string;
   date_stop?: string;
+  account_name?: string;
+  ad_account_id?: string;
 }
 
 export interface SalesTrend {
@@ -32,6 +34,8 @@ export interface RecentCampaign {
   date_stop?: string;
   created_at?: string;
   thumbnail?: string;
+  account_name?: string;
+  ad_account_id?: string;
 }
 
 export interface Ad {
@@ -116,7 +120,9 @@ export function transformDashboardData(data: any): DashboardData {
     date_start: c.start_time || c.start_date || c.date_start || null,
     date_stop: c.end_time || c.end_date || c.stop_time || c.date_stop || null,
     created_at: c.created_at || new Date().toISOString(),
-    thumbnail: c.thumbnail
+    thumbnail: c.thumbnail,
+    account_name: c.account_name,
+    ad_account_id: c.ad_account_id
   });
 
   return {
@@ -134,6 +140,8 @@ export function transformDashboardData(data: any): DashboardData {
       cpa: Number(c.cpa || 0),
       date_start: c.date_start || c.start_time || null,
       date_stop: c.date_stop || c.end_time || null,
+      account_name: c.account_name,
+      ad_account_id: c.ad_account_id
     }))
       .filter((c: Campaign) => c.name && c.name !== 'Unnamed Campaign' && c.id)
       : [],
