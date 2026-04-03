@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
         const supabase = createClient(supabaseUrl, supabaseKey);
 
-        // 1. Get ALL Meta Connection Details for User (supports multiple ad accounts)
+        // 1. Get ALL Meta Connection Details for User
         const [connectionsResult, accountNamesResult] = await Promise.all([
             supabase
                 .from('meta_connections')
@@ -44,49 +44,71 @@ Deno.serve(async (req) => {
                 .eq('user_id', userId)
         ]);
 
-        const { data: connections, error: connError } = connectionsResult;
+        const connections = connectionsResult.data || [];
+        const managerAccounts = accountNamesResult.data || [];
 
-        if (connError || !connections || connections.length === 0) {
-            console.error("[get-meta-campaigns] User Meta connections missing:", connError?.message);
+        if (connections.length === 0) {
+            console.error("[get-meta-campaigns] User Meta connections missing");
             return new Response(JSON.stringify({
-                recent_campaigns: [],
-                top_5_campaigns: [],
-                active_campaigns: []
+                recent_campaigns: [], top_5_campaigns: [], active_campaigns: []
             }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
                 status: 200,
             });
         }
 
-        // Build account name lookup map from manager_meta_accounts
+        // Use the primary token for fetching (Manager accounts usually use the same FB profile token)
+        const defaultToken = connections.find(c => c.access_token)?.access_token;
+
+        if (!defaultToken) {
+            return new Response(JSON.stringify({
+                recent_campaigns: [], top_5_campaigns: [], active_campaigns: []
+            }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200,
+            });
+        }
+
+        const targetsMap = new Map<string, string>(); // adAccountId -> accessToken
         const accountNameMap: Record<string, string> = {};
-        (accountNamesResult.data || []).forEach((a: any) => {
-            // account_id in manager_meta_accounts may or may not have act_ prefix
-            const normalized = a.account_id.startsWith('act_') ? a.account_id : `act_${a.account_id}`;
-            accountNameMap[normalized] = a.account_name;
-            accountNameMap[a.account_id] = a.account_name; // also store without prefix
+
+        // 1. Add connection ad accounts
+        connections.forEach((c: any) => {
+            if (c.ad_account_id && c.access_token) {
+                const normalized = c.ad_account_id.startsWith('act_') ? c.ad_account_id : `act_${c.ad_account_id}`;
+                targetsMap.set(normalized, c.access_token);
+            }
         });
 
-        // Filter to only valid connections with both token and account ID
-        const validConnections = connections.filter((c: any) => c.access_token && c.ad_account_id);
-        if (validConnections.length === 0) {
+        // 2. Add manager accounts
+        managerAccounts.forEach((a: any) => {
+            if (a.account_id) {
+                const normalized = a.account_id.startsWith('act_') ? a.account_id : `act_${a.account_id}`;
+                targetsMap.set(normalized, defaultToken);
+                
+                accountNameMap[normalized] = a.account_name;
+                accountNameMap[a.account_id] = a.account_name;
+            }
+        });
+
+        const targets = Array.from(targetsMap.entries()).map(([adAccountId, accessToken]) => ({ adAccountId, accessToken }));
+
+        if (targets.length === 0) {
             return new Response(JSON.stringify({
-                recent_campaigns: [],
-                top_5_campaigns: [],
-                active_campaigns: []
+                recent_campaigns: [], top_5_campaigns: [], active_campaigns: []
             }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
                 status: 200,
             });
         }
 
-        // 2. Fetch campaigns from ALL connected ad accounts in parallel
+        // 2. Fetch campaigns from ALL targeted ad accounts in parallel
         const allCampaigns: any[] = [];
 
-        const fetchPromises = validConnections.map(async (conn: any) => {
+        const fetchPromises = targets.map(async (conn: any) => {
             try {
-                const accessToken = conn.access_token;
-                const adAccountId = conn.ad_account_id;
+                const accessToken = conn.accessToken;
+                const adAccountId = conn.adAccountId;
 
                 // 2.1 Fetch Ad Account details first to get currency
                 const accountUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=name,currency,timezone_name&access_token=${accessToken}`;

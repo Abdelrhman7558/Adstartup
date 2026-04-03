@@ -33,28 +33,22 @@ Deno.serve(async (req) => {
         const supabase = createClient(supabaseUrl, supabaseKey);
 
         // 1. Get ALL Meta Connection Details for User
-        const { data: connections, error: connError } = await supabase
-            .from('meta_connections')
-            .select('access_token, ad_account_id')
-            .eq('user_id', userId);
+        const [connectionsResult, accountNamesResult] = await Promise.all([
+            supabase
+                .from('meta_connections')
+                .select('access_token, ad_account_id')
+                .eq('user_id', userId),
+            supabase
+                .from('manager_meta_accounts')
+                .select('account_id, account_name')
+                .eq('user_id', userId)
+        ]);
 
-        if (connError || !connections || connections.length === 0) {
-            console.error("[get-meta-insights] User Meta connections missing:", connError?.message);
-            return new Response(JSON.stringify({
-                insights: {
-                    summary_cards: [],
-                    activity_grid: [],
-                    campaign_performance: [],
-                    weekly_trend: []
-                }
-            }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            });
-        }
+        const connections = connectionsResult.data || [];
+        const managerAccounts = accountNamesResult.data || [];
 
-        const validConnections = connections.filter((c: any) => c.access_token && c.ad_account_id);
-        if (validConnections.length === 0) {
+        if (connections.length === 0) {
+            console.error("[get-meta-insights] User Meta connections missing");
             return new Response(JSON.stringify({
                 insights: { summary_cards: [], activity_grid: [], campaign_performance: [], weekly_trend: [] }
             }), {
@@ -63,14 +57,53 @@ Deno.serve(async (req) => {
             });
         }
 
-        // 2. Fetch insights from ALL connected ad accounts in parallel
+        const defaultToken = connections.find((c: any) => c.access_token)?.access_token;
+        if (!defaultToken) {
+            return new Response(JSON.stringify({
+                insights: { summary_cards: [], activity_grid: [], campaign_performance: [], weekly_trend: [] }
+            }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200,
+            });
+        }
+
+        const targetsMap = new Map<string, string>(); // adAccountId -> accessToken
+
+        // 1. Add connection ad accounts
+        connections.forEach((c: any) => {
+            if (c.ad_account_id && c.access_token) {
+                const normalized = c.ad_account_id.startsWith('act_') ? c.ad_account_id : `act_${c.ad_account_id}`;
+                targetsMap.set(normalized, c.access_token);
+            }
+        });
+
+        // 2. Add manager accounts
+        managerAccounts.forEach((a: any) => {
+            if (a.account_id) {
+                const normalized = a.account_id.startsWith('act_') ? a.account_id : `act_${a.account_id}`;
+                targetsMap.set(normalized, defaultToken);
+            }
+        });
+
+        const targets = Array.from(targetsMap.entries()).map(([adAccountId, accessToken]) => ({ adAccountId, accessToken }));
+
+        if (targets.length === 0) {
+            return new Response(JSON.stringify({
+                insights: { summary_cards: [], activity_grid: [], campaign_performance: [], weekly_trend: [] }
+            }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 200,
+            });
+        }
+
+        // 2. Fetch insights from ALL targeted ad accounts in parallel
         const allInsightsData: any[] = [];
 
-        const fetchPromises = validConnections.map(async (conn: any) => {
+        const fetchPromises = targets.map(async (conn: any) => {
             try {
-                const url = `https://graph.facebook.com/v21.0/${conn.ad_account_id}/insights?fields=campaign_id,campaign_name,impressions,clicks,spend,ctr,cpc,reach,actions,action_values,purchase_roas,date_start&level=campaign&limit=200&date_preset=last_30d&access_token=${conn.access_token}`;
+                const url = `https://graph.facebook.com/v21.0/${conn.adAccountId}/insights?fields=campaign_id,campaign_name,impressions,clicks,spend,ctr,cpc,reach,actions,action_values,purchase_roas,date_start&level=campaign&limit=200&date_preset=last_30d&access_token=${conn.accessToken}`;
 
-                console.log(`[get-meta-insights] Fetching from Meta for account ${conn.ad_account_id}...`);
+                console.log(`[get-meta-insights] Fetching from Meta for account ${conn.adAccountId}...`);
                 const metaRes = await fetch(url);
                 const metaData = await metaRes.json();
 
