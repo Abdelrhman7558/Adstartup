@@ -33,10 +33,14 @@ Deno.serve(async (req) => {
         const supabase = createClient(supabaseUrl, supabaseKey);
 
         // 1. Get ALL Meta Connection Details for User
-        const [connectionsResult, accountNamesResult] = await Promise.all([
+        const [connectionsResult, selectionsResult, accountNamesResult] = await Promise.all([
             supabase
                 .from('meta_connections')
                 .select('access_token, ad_account_id')
+                .eq('user_id', userId),
+            supabase
+                .from('meta_account_selections')
+                .select('access_token, ad_account_id, ad_account_name')
                 .eq('user_id', userId),
             supabase
                 .from('manager_meta_accounts')
@@ -45,9 +49,17 @@ Deno.serve(async (req) => {
         ]);
 
         const connections = connectionsResult.data || [];
+        const selections = selectionsResult.data || [];
         const managerAccounts = accountNamesResult.data || [];
 
-        if (connections.length === 0) {
+        // Gather all tokens
+        const tokensSet = new Set<string>();
+        [...connections, ...selections].forEach((c: any) => {
+           if (c.access_token) tokensSet.add(c.access_token);
+        });
+        const tokens = Array.from(tokensSet);
+
+        if (tokens.length === 0) {
             console.error("[get-meta-insights] User Meta connections missing");
             return new Response(JSON.stringify({
                 insights: { summary_cards: [], activity_grid: [], campaign_performance: [], weekly_trend: [] }
@@ -57,37 +69,29 @@ Deno.serve(async (req) => {
             });
         }
 
-        const defaultToken = connections.find((c: any) => c.access_token)?.access_token;
-        if (!defaultToken) {
-            return new Response(JSON.stringify({
-                insights: { summary_cards: [], activity_grid: [], campaign_performance: [], weekly_trend: [] }
-            }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            });
-        }
-
-        const targetsMap = new Map<string, string>(); // adAccountId -> accessToken
-
-        // 1. Add connection ad accounts
+        // Build target accounts map: normalized_id -> display_name
+        const targetAccounts = new Map<string, string>();
+        
         connections.forEach((c: any) => {
-            if (c.ad_account_id && c.access_token) {
-                const normalized = c.ad_account_id.startsWith('act_') ? c.ad_account_id : `act_${c.ad_account_id}`;
-                targetsMap.set(normalized, c.access_token);
-            }
+           if (c.ad_account_id) {
+               const id = c.ad_account_id.startsWith('act_') ? c.ad_account_id : `act_${c.ad_account_id}`;
+               targetAccounts.set(id, 'Primary');
+           }
+        });
+        selections.forEach((c: any) => {
+           if (c.ad_account_id) {
+               const id = c.ad_account_id.startsWith('act_') ? c.ad_account_id : `act_${c.ad_account_id}`;
+               targetAccounts.set(id, c.ad_account_name || 'Selected');
+           }
+        });
+        managerAccounts.forEach((c: any) => {
+           if (c.account_id) {
+               const id = c.account_id.startsWith('act_') ? c.account_id : `act_${c.account_id}`;
+               targetAccounts.set(id, c.account_name || id);
+           }
         });
 
-        // 2. Add manager accounts
-        managerAccounts.forEach((a: any) => {
-            if (a.account_id) {
-                const normalized = a.account_id.startsWith('act_') ? a.account_id : `act_${a.account_id}`;
-                targetsMap.set(normalized, defaultToken);
-            }
-        });
-
-        const targets = Array.from(targetsMap.entries()).map(([adAccountId, accessToken]) => ({ adAccountId, accessToken }));
-
-        if (targets.length === 0) {
+        if (targetAccounts.size === 0) {
             return new Response(JSON.stringify({
                 insights: { summary_cards: [], activity_grid: [], campaign_performance: [], weekly_trend: [] }
             }), {
@@ -99,24 +103,30 @@ Deno.serve(async (req) => {
         // 2. Fetch insights from ALL targeted ad accounts in parallel
         const allInsightsData: any[] = [];
 
-        const fetchPromises = targets.map(async (conn: any) => {
-            try {
-                const url = `https://graph.facebook.com/v21.0/${conn.adAccountId}/insights?fields=campaign_id,campaign_name,impressions,clicks,spend,ctr,cpc,reach,actions,action_values,purchase_roas,date_start&level=campaign&limit=200&date_preset=last_30d&access_token=${conn.accessToken}`;
+        const fetchPromises = Array.from(targetAccounts.entries()).map(async ([adAccountId, targetName]) => {
+            let successData = null;
+            
+            for (const token of tokens) {
+                try {
+                    // Just fetch directly since insights don't explicitly need the account name formatted 
+                    // the same way, but we'll try the token
+                    const url = `https://graph.facebook.com/v21.0/${adAccountId}/insights?fields=campaign_id,campaign_name,impressions,clicks,spend,ctr,cpc,reach,actions,action_values,purchase_roas,date_start&level=campaign&limit=200&date_preset=last_30d&access_token=${token}`;
 
-                console.log(`[get-meta-insights] Fetching from Meta for account ${conn.adAccountId}...`);
-                const metaRes = await fetch(url);
-                const metaData = await metaRes.json();
+                    console.log(`[get-meta-insights] Fetching from Meta for account ${adAccountId}...`);
+                    const metaRes = await fetch(url);
+                    if (!metaRes.ok) {
+                        continue;
+                    }
 
-                if (!metaRes.ok) {
-                    console.error(`[get-meta-insights] Meta API error for ${conn.ad_account_id}:`, metaData.error?.message);
-                    return [];
+                    const metaData = await metaRes.json();
+                    successData = metaData.data || [];
+                    break; // Token worked!
+                } catch (err) {
+                    console.error(`[get-meta-insights] Error fetching account ${adAccountId}:`, err);
                 }
-
-                return metaData.data || [];
-            } catch (err) {
-                console.error(`[get-meta-insights] Error fetching account ${conn.ad_account_id}:`, err);
-                return [];
             }
+            
+            return successData || [];
         });
 
         const results = await Promise.all(fetchPromises);

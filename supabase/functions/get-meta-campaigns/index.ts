@@ -33,10 +33,14 @@ Deno.serve(async (req) => {
         const supabase = createClient(supabaseUrl, supabaseKey);
 
         // 1. Get ALL Meta Connection Details for User
-        const [connectionsResult, accountNamesResult] = await Promise.all([
+        const [connectionsResult, selectionsResult, accountNamesResult] = await Promise.all([
             supabase
                 .from('meta_connections')
                 .select('access_token, ad_account_id')
+                .eq('user_id', userId),
+            supabase
+                .from('meta_account_selections')
+                .select('access_token, ad_account_id, ad_account_name')
                 .eq('user_id', userId),
             supabase
                 .from('manager_meta_accounts')
@@ -45,9 +49,17 @@ Deno.serve(async (req) => {
         ]);
 
         const connections = connectionsResult.data || [];
+        const selections = selectionsResult.data || [];
         const managerAccounts = accountNamesResult.data || [];
 
-        if (connections.length === 0) {
+        // Gather all tokens
+        const tokensSet = new Set<string>();
+        [...connections, ...selections].forEach((c: any) => {
+           if (c.access_token) tokensSet.add(c.access_token);
+        });
+        const tokens = Array.from(tokensSet);
+
+        if (tokens.length === 0) {
             console.error("[get-meta-campaigns] User Meta connections missing");
             return new Response(JSON.stringify({
                 recent_campaigns: [], top_5_campaigns: [], active_campaigns: []
@@ -57,43 +69,29 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Use the primary token for fetching (Manager accounts usually use the same FB profile token)
-        const defaultToken = connections.find(c => c.access_token)?.access_token;
-
-        if (!defaultToken) {
-            return new Response(JSON.stringify({
-                recent_campaigns: [], top_5_campaigns: [], active_campaigns: []
-            }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 200,
-            });
-        }
-
-        const targetsMap = new Map<string, string>(); // adAccountId -> accessToken
-        const accountNameMap: Record<string, string> = {};
-
-        // 1. Add connection ad accounts
+        // Build target accounts map: normalized_id -> display_name
+        const targetAccounts = new Map<string, string>();
+        
         connections.forEach((c: any) => {
-            if (c.ad_account_id && c.access_token) {
-                const normalized = c.ad_account_id.startsWith('act_') ? c.ad_account_id : `act_${c.ad_account_id}`;
-                targetsMap.set(normalized, c.access_token);
-            }
+           if (c.ad_account_id) {
+               const id = c.ad_account_id.startsWith('act_') ? c.ad_account_id : `act_${c.ad_account_id}`;
+               targetAccounts.set(id, 'Primary');
+           }
+        });
+        selections.forEach((c: any) => {
+           if (c.ad_account_id) {
+               const id = c.ad_account_id.startsWith('act_') ? c.ad_account_id : `act_${c.ad_account_id}`;
+               targetAccounts.set(id, c.ad_account_name || 'Selected');
+           }
+        });
+        managerAccounts.forEach((c: any) => {
+           if (c.account_id) {
+               const id = c.account_id.startsWith('act_') ? c.account_id : `act_${c.account_id}`;
+               targetAccounts.set(id, c.account_name || id);
+           }
         });
 
-        // 2. Add manager accounts
-        managerAccounts.forEach((a: any) => {
-            if (a.account_id) {
-                const normalized = a.account_id.startsWith('act_') ? a.account_id : `act_${a.account_id}`;
-                targetsMap.set(normalized, defaultToken);
-                
-                accountNameMap[normalized] = a.account_name;
-                accountNameMap[a.account_id] = a.account_name;
-            }
-        });
-
-        const targets = Array.from(targetsMap.entries()).map(([adAccountId, accessToken]) => ({ adAccountId, accessToken }));
-
-        if (targets.length === 0) {
+        if (targetAccounts.size === 0) {
             return new Response(JSON.stringify({
                 recent_campaigns: [], top_5_campaigns: [], active_campaigns: []
             }), {
@@ -105,47 +103,46 @@ Deno.serve(async (req) => {
         // 2. Fetch campaigns from ALL targeted ad accounts in parallel
         const allCampaigns: any[] = [];
 
-        const fetchPromises = targets.map(async (conn: any) => {
-            try {
-                const accessToken = conn.accessToken;
-                const adAccountId = conn.adAccountId;
+        const fetchPromises = Array.from(targetAccounts.entries()).map(async ([adAccountId, targetName]) => {
+            let successData = null;
+            
+            for (const token of tokens) {
+                try {
+                    // Try fetch account details
+                    const accountUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=name,currency,timezone_name&access_token=${token}`;
+                    const accountRes = await fetch(accountUrl);
+                    
+                    if (!accountRes.ok) {
+                       // Token doesn't have access to this account, try next token
+                       continue;
+                    }
+                    
+                    const accountInfo = await accountRes.json();
+                    const currency = accountInfo.currency || 'USD';
+                    const currencyOffset = ['JPY', 'KRW', 'CLP', 'PYG'].includes(currency) ? 1 : 100;
+                    
+                    // Prioritize Graph API name, fallback to what we stored
+                    const finalName = accountInfo.name || targetName;
 
-                // 2.1 Fetch Ad Account details first to get currency
-                const accountUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=name,currency,timezone_name&access_token=${accessToken}`;
-                const accountRes = await fetch(accountUrl);
-                const accountInfo = await accountRes.json();
-                
-                const currency = accountInfo.currency || 'USD';
-                // Most currencies use a 100 multiplier (cents), but some (like JPY) are 1:1
-                const currencyOffset = ['JPY', 'KRW', 'CLP', 'PYG'].includes(currency) ? 1 : 100;
-                const accountDisplayName = accountInfo.name || accountNameMap[adAccountId] || adAccountId;
+                    const fields = [
+                        'id', 'name', 'status', 'objective', 'start_time', 'stop_time',
+                        'insights.date_preset(last_30d){impressions,clicks,spend,actions,action_values,purchase_roas,date_start,date_stop}',
+                        'adsets.limit(1){daily_budget,lifetime_budget,start_time}',
+                        'ads.limit(1){creative{thumbnail_url,object_story_spec{link_data{image_hash,picture},video_data{video_id}}}}'
+                    ].join(',');
 
-                // 2.2 Fetch campaigns with insights (last 30 days), adset daily_budget, and ad creative thumbnails
-                const fields = [
-                    'id',
-                    'name',
-                    'status',
-                    'objective',
-                    'start_time',
-                    'stop_time',
-                    'insights.date_preset(last_30d){impressions,clicks,spend,actions,action_values,purchase_roas,date_start,date_stop}',
-                    'adsets.limit(1){daily_budget,lifetime_budget,start_time}',
-                    'ads.limit(1){creative{thumbnail_url,object_story_spec{link_data{image_hash,picture},video_data{video_id}}}}'
-                ].join(',');
-
-                const url = `https://graph.facebook.com/v21.0/${adAccountId}/campaigns?fields=${encodeURIComponent(fields)}&limit=1000&access_token=${accessToken}`;
-
-                console.log(`[get-meta-campaigns] Fetching campaigns for ${accountDisplayName} (${adAccountId})...`);
-                const metaRes = await fetch(url);
-                const metaData = await metaRes.json();
-
-                if (!metaRes.ok) {
-                    console.error(`[get-meta-campaigns] Meta API error for ${adAccountId}:`, metaData.error?.message);
-                    return [];
-                }
-
-                return (metaData.data || []).map((campaign: any) => {
-                    const insight = campaign.insights?.data?.[0] || {};
+                    const url = `https://graph.facebook.com/v21.0/${adAccountId}/campaigns?fields=${encodeURIComponent(fields)}&limit=1000&access_token=${token}`;
+                    
+                    console.log(`[get-meta-campaigns] Fetching campaigns for ${finalName} (${adAccountId})...`);
+                    const metaRes = await fetch(url);
+                    if (!metaRes.ok) {
+                       continue; // Should rarely happen if account request succeeded, but just in case
+                    }
+                    
+                    const metaData = await metaRes.json();
+                    
+                    successData = (metaData.data || []).map((campaign: any) => {
+                        const insight = campaign.insights?.data?.[0] || {};
 
                     const spend = Number(insight.spend || 0);
                     const impressions = Number(insight.impressions || 0);
@@ -213,15 +210,21 @@ Deno.serve(async (req) => {
                         end_date: insight.date_stop || null,
                         thumbnail,
                         ad_account_id: adAccountId,
-                        account_name: accountDisplayName,
+                        account_name: finalName,
                         currency,
                     };
                 });
+                
+                // Break out of the token loop since we succeeded
+                break;
+                
             } catch (err) {
-                console.error(`[get-meta-campaigns] Error fetching account ${conn.ad_account_id}:`, err);
-                return [];
+                console.error(`[get-meta-campaigns] Error with token for ${adAccountId}:`, err);
             }
-        });
+        }
+        
+        return successData || [];
+    });
 
         const results = await Promise.all(fetchPromises);
         results.forEach((campaigns: any[]) => allCampaigns.push(...campaigns));
