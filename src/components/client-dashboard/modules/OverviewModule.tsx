@@ -9,18 +9,16 @@ import { AnalyticsChart } from '../AnalyticsChart';
 import { ViewerBehavior } from '../ViewerBehavior';
 import { CampaignCards } from '../CampaignCards';
 import { CampaignCardsSkeleton } from '../skeletons/CampaignCardsSkeleton';
-import { ChevronDown } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { cn } from '../../../lib/utils';
 
 type FilterState = 'All' | 'Active' | 'Draft';
 
 export default function OverviewModule() {
-    const [timeRange] = useState<TimeRange>('all');
+    const [timeRange, setTimeRange] = useState<TimeRange>('all');
     const [campaignFilter, setCampaignFilter] = useState<FilterState>('All');
 
     const now = new Date();
-    const currentMonthLabel = format(now, 'MMMM yyyy');
     const currentMonthRange = `1 ${format(startOfMonth(now), 'MMMM')} - ${format(endOfMonth(now), 'd MMMM yyyy')}`;
 
     const {
@@ -52,11 +50,18 @@ export default function OverviewModule() {
                     <p className="text-gray-500 text-sm mt-1">Real-time insights into the month's performance</p>
                 </div>
 
-                {/* Month Selector mapping to design */}
-                <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 shadow-sm transition-colors">
-                    {currentMonthLabel}
-                    <ChevronDown className="w-4 h-4 text-gray-500" />
-                </button>
+                {/* Month Selector dropdown */}
+                <select 
+                    value={timeRange}
+                    onChange={(e) => setTimeRange(e.target.value as TimeRange)}
+                    className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none pr-8 relative cursor-pointer"
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
+                >
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="last7days">Last 7 Days</option>
+                    <option value="last30days">Last 30 Days</option>
+                </select>
             </div>
 
             {/* Summary Engagement Section */}

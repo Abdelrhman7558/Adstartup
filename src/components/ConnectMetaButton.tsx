@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LinkIcon } from 'lucide-react';
 import { validateUserId } from '../lib/webhookUtils';
+import { supabase } from '../lib/supabase';
 
 interface ConnectMetaButtonProps {
   userId: string | undefined;
@@ -9,6 +10,7 @@ interface ConnectMetaButtonProps {
   className?: string;
   variant?: 'button' | 'compact';
   trialExpired?: boolean;
+  onDisconnect?: () => void;
 }
 
 export default function ConnectMetaButton({
@@ -18,6 +20,7 @@ export default function ConnectMetaButton({
   className = '',
   variant = 'button',
   trialExpired = false,
+  onDisconnect,
 }: ConnectMetaButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -52,6 +55,27 @@ export default function ConnectMetaButton({
     }
   };
 
+  const handleDisconnect = async () => {
+    if (!userId || !confirm('Are you sure you want to disconnect your Meta account?')) return;
+    
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('meta_connections')
+        .delete()
+        .eq('user_id', userId);
+        
+      if (error) throw error;
+      
+      onDisconnect?.();
+      window.location.reload(); // Quick refresh to update all states
+    } catch (err) {
+      console.error('Error disconnecting:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (variant === 'compact') {
     if (isConnected) {
       return (
@@ -76,9 +100,18 @@ export default function ConnectMetaButton({
 
   if (isConnected) {
     return (
-      <div className={`flex items-center gap-3 px-6 py-3 bg-green-50 border border-green-200 rounded-xl ${className}`}>
-        <div className="w-3 h-3 bg-green-600 rounded-full"></div>
-        <span className="font-semibold text-green-900">Active Account</span>
+      <div className={`flex items-center justify-between gap-3 px-6 py-3 bg-green-50 border border-green-200 rounded-xl w-full sm:w-auto ${className}`}>
+        <div className="flex items-center gap-3">
+          <div className="w-3 h-3 bg-green-600 rounded-full animate-pulse"></div>
+          <span className="font-semibold text-green-900">Active Account</span>
+        </div>
+        <button 
+            onClick={handleDisconnect}
+            disabled={isLoading}
+            className="ml-4 px-3 py-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+        >
+            {isLoading ? 'Disconnecting...' : 'Disconnect'}
+        </button>
       </div>
     );
   }

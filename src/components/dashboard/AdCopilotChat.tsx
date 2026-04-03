@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Bot, User, Loader2 } from 'lucide-react';
+import { X, Send, Bot, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
@@ -80,7 +80,7 @@ export default function AdCopilotChat() {
             });
 
             if (!response.ok) {
-                let errText = await response.text();
+                await response.text();
                 throw new Error(`Server ERROR: ${response.status}`);
             }
 
@@ -238,11 +238,11 @@ export default function AdCopilotChat() {
                     animation: !isOpen ? 'bounce 2s infinite' : 'none' 
                 }}
             >
-                {isOpen ? <X className="w-6 h-6" /> : <MessageSquare className="w-6 h-6" />}
+                {isOpen ? <X className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
             </button>
             {!isOpen && (
                <div className="absolute bottom-16 right-0 mb-2 mr-2 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-lg shadow-lg border border-blue-100 dark:border-gray-700 text-sm font-semibold tracking-wide flex items-center space-x-2 animate-pulse whitespace-nowrap">
-                   <span dir="rtl">تحدث مع الذكاء الاصطناعي!</span>
+                   <span dir="auto">{document.documentElement.dir === 'rtl' ? 'كيف يمكنني مساعدتك؟!' : 'How can I help you ?!'}</span>
                </div>
             )}
         </div>

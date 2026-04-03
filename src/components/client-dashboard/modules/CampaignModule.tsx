@@ -1,27 +1,53 @@
 import { useState } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { useCampaignsAgent } from '../../../lib/agents/CampaignAgent';
-import { CampaignCards } from '../CampaignCards';
-import { CampaignCardsSkeleton } from '../skeletons/CampaignCardsSkeleton';
 import { Plus } from 'lucide-react';
-import { cn } from '../../../lib/utils';
-
-type FilterState = 'All' | 'Active' | 'Draft';
+import CampaignsTable from '../CampaignsTable';
+import OptimizationLogs, { OptimizationLog } from '../OptimizationLogs';
 
 export default function CampaignModule() {
-    const [filter, setFilter] = useState<FilterState>('All');
-    const { data: campaigns, isLoading } = useCampaignsAgent();
     const now = new Date();
     const currentMonthRange = `1 ${format(startOfMonth(now), 'MMMM')} - ${format(endOfMonth(now), 'd MMMM yyyy')}`;
 
-    const filteredCampaigns = campaigns?.filter(c => {
-        if (filter === 'All') return true;
-        return c.status.toLowerCase() === filter.toLowerCase();
-    });
+    const [logs, setLogs] = useState<OptimizationLog[]>([
+        {
+            id: '1',
+            action: 'AI Optimization Engine Started',
+            details: 'Ready to manage daily budgets and scale successful campaigns.',
+            timestamp: new Date(),
+            type: 'general'
+        }
+    ]);
+
+    const handleActionCompleted = (action: string, metadata?: any) => {
+        let type: OptimizationLog['type'] = 'general';
+        let details = '';
+
+        if (action.includes('Enabled')) {
+            type = 'scaling';
+            details = metadata?.campaignId 
+                ? `Optimization enabled for campaign ${metadata.campaignId.slice(-6)}` 
+                : 'Optimization enabled for all campaigns';
+        } else if (action.includes('Disabled')) {
+            type = 'alert';
+            details = metadata?.campaignId 
+                ? `Optimization paused for campaign ${metadata.campaignId.slice(-6)}` 
+                : 'Optimization disabled for all campaigns';
+        }
+
+        const newLog: OptimizationLog = {
+            id: Date.now().toString(),
+            action,
+            details,
+            timestamp: new Date(),
+            type
+        };
+
+        setLogs(prev => [newLog, ...prev]);
+    };
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 pb-12">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-b border-gray-100 pb-6">
+        <div className="space-y-6 animate-in fade-in duration-500 pb-12 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-b border-gray-100 pb-6 w-full">
                 <div>
                     <h1 className="text-xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
                         Campaign
@@ -33,25 +59,6 @@ export default function CampaignModule() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {/* Filter Toggle */}
-                    <div className="flex items-center bg-gray-100/80 p-1 rounded-xl">
-                        {(['All', 'Active', 'Draft'] as FilterState[]).map((f) => (
-                            <button
-                                key={f}
-                                onClick={() => setFilter(f)}
-                                className={cn(
-                                    "px-5 py-1.5 text-sm font-semibold rounded-lg transition-all duration-200",
-                                    filter === f
-                                        ? "bg-white shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)] text-gray-900"
-                                        : "text-gray-500 hover:text-gray-700"
-                                )}
-                            >
-                                {f}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* New Campaign Button */}
                     <button
                         onClick={() => window.dispatchEvent(new Event('openNewCampaignModal'))}
                         className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-semibold rounded-xl hover:bg-red-600 transition-all shadow-sm shadow-red-200 hover:shadow-md hover:shadow-red-200"
@@ -62,11 +69,14 @@ export default function CampaignModule() {
                 </div>
             </div>
 
-            {isLoading || !filteredCampaigns ? (
-                <CampaignCardsSkeleton />
-            ) : (
-                <CampaignCards campaigns={filteredCampaigns} />
-            )}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 w-full">
+                <div className="xl:col-span-2 space-y-6">
+                    <CampaignsTable onActionCompleted={handleActionCompleted} />
+                </div>
+                <div className="xl:col-span-1 h-[600px] xl:h-auto">
+                    <OptimizationLogs logs={logs} />
+                </div>
+            </div>
         </div>
     );
 }

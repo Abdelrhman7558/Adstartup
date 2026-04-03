@@ -4,7 +4,6 @@ import {
     Link as LinkIcon,
     Megaphone,
     BarChart3,
-    CreditCard,
     Settings,
     Target,
     CalendarDays,
@@ -35,7 +34,6 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
     ];
 
     const bottomItems = [
-        { name: 'Billing', path: '/dashboard/billing', icon: CreditCard },
         { name: 'Business Settings', path: '/dashboard/settings', icon: Settings },
     ];
 
