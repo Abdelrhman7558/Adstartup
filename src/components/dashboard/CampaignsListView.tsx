@@ -110,7 +110,8 @@ export default function CampaignsListView() {
           </div>
           <div className="flex items-center gap-3">
             {isManager && (
-              <div className="px-3 py-1 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-full text-xs font-bold uppercase tracking-wider">
+              <div className="px-3 py-1 bg-blue-500/10 text-blue-500 border border-blue-500/20 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5" />
                 Manager Plan
               </div>
             )}
