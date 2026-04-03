@@ -1,5 +1,7 @@
 import { Search, Bell, Share2, Menu } from 'lucide-react';
 import { toast } from '../ui/Toast';
+import { useState, useEffect, useRef } from 'react';
+import OptimizationLogs, { OptimizationLog } from './OptimizationLogs';
 
 interface ClientHeaderProps {
     onMenuClick: () => void;
@@ -14,7 +16,36 @@ export function ClientHeader({ onMenuClick }: ClientHeaderProps) {
             toast('Failed to copy link', 'error');
         }
     };
-    const handleNotifications = () => toast('No new notifications', 'info');
+
+    const [isNotifOpen, setIsNotifOpen] = useState(false);
+    const [logs, setLogs] = useState<OptimizationLog[]>([
+        {
+            id: '1',
+            action: 'AI Optimization Engine Started',
+            details: 'Ready to manage daily budgets and scale successful campaigns.',
+            timestamp: new Date(),
+            type: 'general'
+        }
+    ]);
+    const notifRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+         const handleLog = (e: CustomEvent) => {
+              setLogs(prev => [e.detail, ...prev]);
+         };
+         window.addEventListener('addOptimizationLog', handleLog as EventListener);
+         return () => window.removeEventListener('addOptimizationLog', handleLog as EventListener);
+    }, []);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+                setIsNotifOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     return (
         <header className="sticky top-0 z-20 w-full bg-[#F8F9FA]/80 backdrop-blur-md border-b border-gray-100 h-[72px] flex items-center">
@@ -64,12 +95,23 @@ export function ClientHeader({ onMenuClick }: ClientHeaderProps) {
                         <Share2 className="w-4 h-4 text-gray-500" />
                     </button>
 
-                    <button
-                        onClick={handleNotifications}
-                        className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
-                    >
-                        <Bell className="w-5 h-5" />
-                    </button>
+                    <div className="relative" ref={notifRef}>
+                        <button
+                            onClick={() => setIsNotifOpen(!isNotifOpen)}
+                            className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
+                        >
+                            <Bell className="w-5 h-5" />
+                            {logs.length > 1 && (
+                                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
+                            )}
+                        </button>
+
+                        {isNotifOpen && (
+                            <div className="absolute right-0 mt-2 w-[360px] h-[450px] bg-white rounded-2xl shadow-xl border border-gray-100 flex flex-col z-50 overflow-hidden transform origin-top-right transition-all">
+                                <OptimizationLogs logs={logs} isDropdown={true} />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </header>

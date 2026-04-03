@@ -1,25 +1,14 @@
-import { useState } from 'react';
+
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Plus } from 'lucide-react';
 import CampaignsTable from '../CampaignsTable';
-import OptimizationLogs, { OptimizationLog } from '../OptimizationLogs';
 
 export default function CampaignModule() {
     const now = new Date();
     const currentMonthRange = `1 ${format(startOfMonth(now), 'MMMM')} - ${format(endOfMonth(now), 'd MMMM yyyy')}`;
 
-    const [logs, setLogs] = useState<OptimizationLog[]>([
-        {
-            id: '1',
-            action: 'AI Optimization Engine Started',
-            details: 'Ready to manage daily budgets and scale successful campaigns.',
-            timestamp: new Date(),
-            type: 'general'
-        }
-    ]);
-
     const handleActionCompleted = (action: string, metadata?: any) => {
-        let type: OptimizationLog['type'] = 'general';
+        let type = 'general';
         let details = '';
 
         if (action.includes('Enabled')) {
@@ -34,7 +23,7 @@ export default function CampaignModule() {
                 : 'Optimization disabled for all campaigns';
         }
 
-        const newLog: OptimizationLog = {
+        const newLog = {
             id: Date.now().toString(),
             action,
             details,
@@ -42,7 +31,7 @@ export default function CampaignModule() {
             type
         };
 
-        setLogs(prev => [newLog, ...prev]);
+        window.dispatchEvent(new CustomEvent('addOptimizationLog', { detail: newLog }));
     };
 
     return (
@@ -69,13 +58,8 @@ export default function CampaignModule() {
                 </div>
             </div>
 
-            <div className="flex flex-col xl:flex-row gap-6 w-full">
-                <div className="flex-1 min-w-0 space-y-6">
-                    <CampaignsTable onActionCompleted={handleActionCompleted} />
-                </div>
-                <div className="w-full xl:w-[340px] shrink-0 h-[600px] xl:h-auto">
-                    <OptimizationLogs logs={logs} />
-                </div>
+            <div className="w-full">
+                <CampaignsTable onActionCompleted={handleActionCompleted} />
             </div>
         </div>
     );

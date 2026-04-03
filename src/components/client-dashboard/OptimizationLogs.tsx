@@ -11,9 +11,10 @@ export interface OptimizationLog {
 
 interface OptimizationLogsProps {
     logs: OptimizationLog[];
+    isDropdown?: boolean;
 }
 
-export function OptimizationLogs({ logs }: OptimizationLogsProps) {
+export function OptimizationLogs({ logs, isDropdown = false }: OptimizationLogsProps) {
     const [animatedLogs, setAnimatedLogs] = useState<OptimizationLog[]>([]);
 
     useEffect(() => {
@@ -37,7 +38,7 @@ export function OptimizationLogs({ logs }: OptimizationLogsProps) {
 
     if (animatedLogs.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center p-8 bg-white border border-gray-100 shadow-sm rounded-2xl h-full">
+            <div className={`flex flex-col items-center justify-center p-8 bg-white h-full ${!isDropdown ? 'border border-gray-100 shadow-sm rounded-2xl' : ''}`}>
                 <Bot className="w-12 h-12 text-gray-300 mb-3" />
                 <h4 className="text-sm font-bold text-gray-800">No Optimization Activity</h4>
                 <p className="text-xs text-gray-500 mt-1 text-center max-w-[200px]">
@@ -48,7 +49,7 @@ export function OptimizationLogs({ logs }: OptimizationLogsProps) {
     }
 
     return (
-        <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-6 h-full overflow-hidden flex flex-col">
+        <div className={`bg-white p-6 h-full overflow-hidden flex flex-col ${!isDropdown ? 'border border-gray-100 shadow-sm rounded-2xl' : ''}`}>
             <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-blue-50 flex flex-shrink-0 items-center justify-center border border-blue-100">
                     <Activity className="w-5 h-5 text-blue-600" />
