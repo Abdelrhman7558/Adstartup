@@ -107,18 +107,17 @@ Deno.serve(async (req) => {
             totalClicks += clicks;
             totalImpressions += impressions;
 
-            // Extract purchase action values
+            // Extract purchase action values from multiple possible action types
             if (item.action_values && Array.isArray(item.action_values)) {
-                item.action_values.forEach((av: any) => {
-                    if (av.action_type === 'purchase') {
-                        totalRevenue += parseFloat(av.value || 0);
-                    }
-                });
+                const purchaseValue = item.action_values.find((av: any) => 
+                    av.action_type === 'purchase' || 
+                    av.action_type === 'offsite_conversion.fb_pixel_purchase'
+                );
+                if (purchaseValue) {
+                    totalRevenue += parseFloat(purchaseValue.value || 0);
+                }
             }
         });
-
-        // Fallback logic from n8n script
-        if (totalRevenue === 0) totalRevenue = totalSpend;
 
         const roi = totalSpend > 0 ? ((totalRevenue - totalSpend) / totalSpend * 100) : 0;
         const conversionRate = totalImpressions > 0 ? (totalClicks / totalImpressions * 100) : 0;

@@ -88,13 +88,24 @@ Deno.serve(async (req) => {
                 const accessToken = conn.access_token;
                 const adAccountId = conn.ad_account_id;
 
-                // Fetch campaigns with insights (last 30 days), adset daily_budget, and ad creative thumbnails
+                // 2.1 Fetch Ad Account details first to get currency
+                const accountUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=name,currency,timezone_name&access_token=${accessToken}`;
+                const accountRes = await fetch(accountUrl);
+                const accountInfo = await accountRes.json();
+                
+                const currency = accountInfo.currency || 'USD';
+                // Most currencies use a 100 multiplier (cents), but some (like JPY) are 1:1
+                const currencyOffset = ['JPY', 'KRW', 'CLP', 'PYG'].includes(currency) ? 1 : 100;
+                const accountDisplayName = accountInfo.name || accountNameMap[adAccountId] || adAccountId;
+
+                // 2.2 Fetch campaigns with insights (last 30 days), adset daily_budget, and ad creative thumbnails
                 const fields = [
                     'id',
                     'name',
                     'status',
                     'objective',
                     'start_time',
+                    'stop_time',
                     'insights.date_preset(last_30d){impressions,clicks,spend,actions,action_values,purchase_roas,date_start,date_stop}',
                     'adsets.limit(1){daily_budget,lifetime_budget,start_time}',
                     'ads.limit(1){creative{thumbnail_url,object_story_spec{link_data{image_hash,picture},video_data{video_id}}}}'
@@ -102,7 +113,7 @@ Deno.serve(async (req) => {
 
                 const url = `https://graph.facebook.com/v21.0/${adAccountId}/campaigns?fields=${encodeURIComponent(fields)}&limit=1000&access_token=${accessToken}`;
 
-                console.log(`[get-meta-campaigns] Fetching from Meta for account ${adAccountId}...`);
+                console.log(`[get-meta-campaigns] Fetching campaigns for ${accountDisplayName} (${adAccountId})...`);
                 const metaRes = await fetch(url);
                 const metaData = await metaRes.json();
 
@@ -110,11 +121,6 @@ Deno.serve(async (req) => {
                     console.error(`[get-meta-campaigns] Meta API error for ${adAccountId}:`, metaData.error?.message);
                     return [];
                 }
-
-                // Determine account name
-                const accountName = accountNameMap[adAccountId]
-                    || accountNameMap[adAccountId.replace('act_', '')]
-                    || adAccountId;
 
                 return (metaData.data || []).map((campaign: any) => {
                     const insight = campaign.insights?.data?.[0] || {};
@@ -126,7 +132,8 @@ Deno.serve(async (req) => {
                     const cpc = clicks > 0 ? spend / clicks : 0;
 
                     const revenue = Number(
-                        insight.action_values?.find((a: any) => a.action_type === 'purchase')?.value || 0
+                        insight.action_values?.find((a: any) => a.action_type === 'purchase')?.value || 
+                        insight.action_values?.find((a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || 0
                     );
 
                     const roas = insight.purchase_roas?.[0]?.value
@@ -134,27 +141,27 @@ Deno.serve(async (req) => {
                         : (spend > 0 ? revenue / spend : 0);
 
                     const purchases = Number(
-                        insight.actions?.find((a: any) => a.action_type === 'purchase')?.value || 0
+                        insight.actions?.find((a: any) => a.action_type === 'purchase')?.value || 
+                        insight.actions?.find((a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || 0
                     );
                     const cpa = purchases > 0 ? spend / purchases : 0;
 
-                    // Extract daily budget from first adset (Meta returns in cents)
+                    // Extract daily budget (Meta returns in currency units * offset)
                     const adset = campaign.adsets?.data?.[0];
-                    const dailyBudgetCents = Number(adset?.daily_budget || 0);
-                    const lifetimeBudgetCents = Number(adset?.lifetime_budget || 0);
-                    // Meta returns budget in cents (integer), divide by 100 for dollars
-                    const daily_budget = dailyBudgetCents > 0 ? dailyBudgetCents / 100 : (lifetimeBudgetCents > 0 ? lifetimeBudgetCents / 100 : 0);
+                    const dailyBudgetRaw = Number(adset?.daily_budget || 0);
+                    const lifetimeBudgetRaw = Number(adset?.lifetime_budget || 0);
+                    const daily_budget = dailyBudgetRaw > 0 ? dailyBudgetRaw / currencyOffset : (lifetimeBudgetRaw > 0 ? lifetimeBudgetRaw / currencyOffset / 30 : 0);
 
-                    // Calculate runtime in days (from campaign start_time to today)
-                    const startTime = campaign.start_time || insight.date_start || null;
+                    // Calculate runtime in days
+                    const startTimeStr = campaign.start_time || insight.date_start || null;
                     let runtime: number | null = null;
-                    if (startTime) {
-                        const startMs = new Date(startTime).getTime();
-                        const nowMs = Date.now();
-                        runtime = Math.max(0, Math.floor((nowMs - startMs) / (1000 * 60 * 60 * 24)));
+                    if (startTimeStr) {
+                        const startMs = new Date(startTimeStr).getTime();
+                        const endMs = campaign.stop_time ? new Date(campaign.stop_time).getTime() : Date.now();
+                        runtime = Math.max(0, Math.floor((endMs - startMs) / (1000 * 60 * 60 * 24)));
                     }
 
-                    // Extract thumbnail from the first ad's creative
+                    // Extract thumbnail
                     const firstAd = campaign.ads?.data?.[0];
                     const creative = firstAd?.creative;
                     const thumbnail = creative?.thumbnail_url
@@ -167,8 +174,8 @@ Deno.serve(async (req) => {
                         name: campaign.name,
                         id: campaign.id,
                         status: campaign.status?.toLowerCase() || null,
-                        daily_budget,
-                        budget: daily_budget,
+                        daily_budget: Number(daily_budget.toFixed(2)),
+                        budget: Number(daily_budget.toFixed(2)),
                         spend: Number(spend.toFixed(2)),
                         revenue: Number(revenue.toFixed(2)),
                         roas: Number(roas.toFixed(2)),
@@ -184,7 +191,8 @@ Deno.serve(async (req) => {
                         end_date: insight.date_stop || null,
                         thumbnail,
                         ad_account_id: adAccountId,
-                        account_name: accountName,
+                        account_name: accountDisplayName,
+                        currency,
                     };
                 });
             } catch (err) {

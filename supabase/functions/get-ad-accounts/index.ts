@@ -37,56 +37,66 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Try meta_connections first
-    const { data: metaConnections, error: metaError } = await supabase
-      .from('meta_connections')
-      .select('access_token')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-      .limit(1);
-
-    const metaConnection = metaConnections?.[0];
-    let accessToken = metaConnection?.access_token;
-
-    // Fallback: check meta_account_selections (token stored after OAuth)
-    if (!accessToken) {
-      const { data: metaSelections } = await supabase
+    // 1. Get ALL available tokens for the user
+    const [metaConnectionsResult, metaSelectionsResult] = await Promise.all([
+      supabase
+        .from('meta_connections')
+        .select('access_token')
+        .eq('user_id', user.id),
+      supabase
         .from('meta_account_selections')
         .select('access_token')
         .eq('user_id', user.id)
-        .order('updated_at', { ascending: false })
-        .limit(1);
-      accessToken = metaSelections?.[0]?.access_token;
-    }
+    ]);
 
-    if (!accessToken) {
+    // 2. Extract unique tokens
+    const tokens = new Set<string>();
+    (metaConnectionsResult.data || []).forEach(c => { if (c.access_token) tokens.add(c.access_token); });
+    (metaSelectionsResult.data || []).forEach(s => { if (s.access_token) tokens.add(s.access_token); });
+
+    const tokenList = Array.from(tokens);
+
+    if (tokenList.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'No Meta connection found' }),
+        JSON.stringify({ error: 'No Meta connection found. Please connect your account first.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    let allAccounts: any[] = [];
-    let url: string | null = `https://graph.facebook.com/v18.0/me/adaccounts?access_token=${accessToken}&fields=id,name,account_status,currency&limit=100`;
+    // 3. Fetch accounts from ALL tokens in parallel
+    const accountMap = new Map<string, any>();
 
-    while (url) {
-      const metaResponse = await fetch(url);
+    const fetchPromises = tokenList.map(async (accessToken) => {
+      let url: string | null = `https://graph.facebook.com/v21.0/me/adaccounts?access_token=${accessToken}&fields=id,name,account_status,currency&limit=100`;
 
-      if (!metaResponse.ok) {
-        const errorData = await metaResponse.json();
-        return new Response(
-          JSON.stringify({ error: errorData.error?.message || 'Failed to fetch ad accounts' }),
-          { status: metaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      while (url) {
+        try {
+          const metaResponse = await fetch(url);
+          if (!metaResponse.ok) {
+            console.error('[get-ad-accounts] Token fetch error:', await metaResponse.text());
+            break; 
+          }
+
+          const metaData = await metaResponse.json();
+          if (metaData.data && Array.isArray(metaData.data)) {
+            metaData.data.forEach((acc: any) => {
+              // Deduplicate by ID
+              if (!accountMap.has(acc.id)) {
+                accountMap.set(acc.id, acc);
+              }
+            });
+          }
+          url = metaData.paging?.next || null;
+        } catch (err) {
+          console.error('[get-ad-accounts] Fetch loop error:', err);
+          break;
+        }
       }
+    });
 
-      const metaData = await metaResponse.json();
-      if (metaData.data && Array.isArray(metaData.data)) {
-        allAccounts = allAccounts.concat(metaData.data);
-      }
+    await Promise.all(fetchPromises);
 
-      url = metaData.paging?.next || null;
-    }
+    const allAccounts = Array.from(accountMap.values());
 
     return new Response(
       JSON.stringify({ data: allAccounts }),
