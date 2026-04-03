@@ -17,6 +17,8 @@ export interface MarketingCampaign {
   top_country?: string;
   top_audience_segment?: string;
   optimization_enabled?: boolean;
+  account_name?: string;
+  ad_account_id?: string;
 }
 
 export interface MarketingAd {

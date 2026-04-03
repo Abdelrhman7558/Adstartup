@@ -64,7 +64,9 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                       conversion: 0,
                       date_start: liveC.date_start || liveC.start_time,
                       date_stop: liveC.date_stop || liveC.end_time,
-                      optimization_enabled: false
+                      optimization_enabled: false,
+                      account_name: liveC.account_name,
+                      ad_account_id: liveC.ad_account_id
                  } as MarketingCampaign);
             });
 
@@ -167,6 +169,7 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                         <tr>
                             <th className="px-4 py-4">ID</th>
                             <th className="px-4 py-4 w-full">Name</th>
+                            <th className="px-4 py-4">Ad Account</th>
                             <th className="px-4 py-4 text-right">Daily Budget</th>
                             <th className="px-4 py-4 text-center">Start Time</th>
                             <th className="px-4 py-4 text-center">End Time</th>
@@ -186,6 +189,11 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                                 </td>
                                 <td className="px-4 py-4 text-sm font-bold text-gray-900 group-hover:text-red-600 transition-colors max-w-[200px] truncate">
                                     {campaign.campaign_name}
+                                </td>
+                                <td className="px-4 py-4">
+                                    <div className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 text-[10px] font-bold border border-blue-100">
+                                        {campaign.account_name || 'Primary'}
+                                    </div>
                                 </td>
                                 <td className="px-4 py-4 text-sm text-gray-700 text-right font-semibold">
                                     ${(campaign.spend || 0).toFixed(2)}
