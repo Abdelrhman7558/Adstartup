@@ -87,7 +87,7 @@ export async function fetchDashboardData(userId: string): Promise<DashboardData>
     if (!Array.isArray(rawRecent)) rawRecent = [];
 
     // Sales Trend Extraction
-    let rawTrend = trendData.sales_trend || trendData;
+    let rawTrend = metaInsights?.sales_trend || trendData?.sales_trend || trendData;
     if (!Array.isArray(rawTrend)) rawTrend = [];
 
     // Top 5 Extraction
@@ -99,9 +99,9 @@ export async function fetchDashboardData(userId: string): Promise<DashboardData>
 
     const combinedData = {
       ...mainData,
-      recent_campaigns: rawRecent.length > 0 ? rawRecent : mainData.recent_campaigns,
-      sales_trend: rawTrend.length > 0 ? rawTrend : mainData.sales_trend,
-      top_5_campaigns: rawTop5.length > 0 ? rawTop5 : mainData.top_5_campaigns,
+      recent_campaigns: rawRecent.length > 0 ? rawRecent : mainData?.recent_campaigns,
+      sales_trend: rawTrend.length > 0 ? rawTrend : mainData?.sales_trend,
+      top_5_campaigns: rawTop5.length > 0 ? rawTop5 : mainData?.top_5_campaigns,
       insights: rawInsights,
     };
 
