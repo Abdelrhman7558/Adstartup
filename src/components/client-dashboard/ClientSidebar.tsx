@@ -25,13 +25,9 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
         { name: 'Overview', path: '/dashboard/overview', icon: LayoutDashboard },
         { name: 'Integration', path: '/dashboard/integration', icon: LinkIcon },
         { name: 'Campaign', path: '/dashboard/campaigns', icon: Megaphone },
+        { name: 'Analytics', path: '/dashboard/analytics', icon: BarChart3 },
     ];
 
-    const analyticsItems = [
-        { name: 'Overall', path: '/dashboard/analytics', icon: BarChart3 },
-        { name: 'Sent', path: '/dashboard/analytics/sent' },
-        { name: 'Campaigns', path: '/dashboard/analytics/campaigns' },
-    ];
 
     const bottomItems = [
         { name: 'Business Settings', path: '/dashboard/settings', icon: Settings },
@@ -107,40 +103,7 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
                         </NavLink>
                     ))}
 
-                    {/* Analytics Dropdown Simulation */}
-                    <div className="mt-2">
-                        <NavLink
-                            to="/dashboard/analytics"
-                            className={({ isActive }) => cn(
-                                "flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer",
-                                isActive
-                                    ? "bg-red-50/80 text-red-600"
-                                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                            )}
-                        >
-                            <div className="flex items-center gap-3">
-                                <BarChart3 className="w-5 h-5 opacity-80" />
-                                Analytics
-                            </div>
-                            <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="18 15 12 9 6 15"></polyline>
-                            </svg>
-                        </NavLink>
-                        <div className="ml-[34px] mt-1 space-y-1 border-l-2 border-gray-100 pl-3">
-                            {analyticsItems.slice(1).map((item) => (
-                                <NavLink
-                                    key={item.name}
-                                    to={item.path}
-                                    className={({ isActive }) => cn(
-                                        "block px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                                        isActive ? "text-red-600 font-semibold" : "text-gray-500 hover:text-gray-900"
-                                    )}
-                                >
-                                    {item.name}
-                                </NavLink>
-                            ))}
-                        </div>
-                    </div>
+
 
                     <div className="my-4 border-t border-gray-100"></div>
 

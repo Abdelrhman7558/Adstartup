@@ -41,20 +41,23 @@ export async function fetchDashboardData(userId: string): Promise<DashboardData>
   try {
     console.log('[Dashboard] Starting parallel webhook requests...', { userId });
 
-    // Fetch legacy or static API data that wasn't replaced yet
     const fetchSafeLegacy = async (url: string, label: string) => {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: userId }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
         const json = await res.json();
         console.log(`[Dashboard] ${label} received:`, json);
         return json;
       } catch (err) {
-        console.error(`[Dashboard] ${label} failed:`, err);
+        console.log(`[Dashboard] ${label} skipped or timed out:`, err);
         return {};
       }
     };

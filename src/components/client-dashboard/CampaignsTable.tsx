@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Loader2, Plus, Info } from 'lucide-react';
 import CampaignDetailsModal from '../dashboard/CampaignDetailsModal';
 import { Campaign } from '../../lib/dataTransformer';
+import { fetchDashboardData } from '../../lib/dashboardDataService';
 
 interface CampaignsTableProps {
     onActionCompleted?: (action: string, metadata?: any) => void;
@@ -25,8 +26,47 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
         if (!user) return;
         setLoading(true);
         try {
-            const data = await marketingDashboardService.getCampaigns(user.id);
-            setCampaigns(data);
+            // Fetch live campaigns from webhook source
+            const liveData = await fetchDashboardData(user.id);
+            const liveCampaigns = [...(liveData.top_5_campaigns || []), ...(liveData.recent_campaigns || [])];
+
+            // Fetch local preferences 
+            const localCampaigns = await marketingDashboardService.getCampaigns(user.id);
+            
+            const mergedMap = new Map<string, MarketingCampaign>();
+
+            // Add live campaigns
+            liveCampaigns.forEach((liveC: any) => {
+                 const mappedId = liveC.id || liveC.campaign_id;
+                 if(!mappedId) return;
+                 mergedMap.set(mappedId, {
+                      campaign_id: mappedId,
+                      campaign_name: liveC.name || liveC.campaign_name || 'Unnamed',
+                      status: liveC.status || 'active',
+                      spend: liveC.spend || 0,
+                      revenue: liveC.revenue || 0,
+                      roas: liveC.roas || 0,
+                      impressions: liveC.impressions || 0,
+                      clicks: liveC.clicks || 0,
+                      ctr: liveC.ctr || 0,
+                      conversion: 0,
+                      date_start: liveC.date_start || liveC.start_time,
+                      date_stop: liveC.date_stop || liveC.end_time,
+                      optimization_enabled: false
+                 } as MarketingCampaign);
+            });
+
+            // Merge local DB saved states (like authorization_enabled)
+            localCampaigns.forEach((localC) => {
+                 if (mergedMap.has(localC.campaign_id)) {
+                      mergedMap.get(localC.campaign_id)!.optimization_enabled = localC.optimization_enabled;
+                 } else {
+                      mergedMap.set(localC.campaign_id, localC);
+                 }
+            });
+
+            // Make sure if we set it locally here, we also create it if missing in supabase when they toggle
+            setCampaigns(Array.from(mergedMap.values()));
         } catch (error) {
             console.error('Error fetching campaigns:', error);
         } finally {
@@ -35,22 +75,35 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
     };
 
     const handleToggleOptimization = async (campaignId: string, currentStatus: boolean, e: React.MouseEvent) => {
-        e.stopPropagation(); // prevent modal open
+        e.stopPropagation();
         if (!user) return;
         const newStatus = !currentStatus;
         try {
-            // Optimistic UI update
+            // Optimistic Update
             setCampaigns(prev => prev.map(c => c.campaign_id === campaignId ? { ...c, optimization_enabled: newStatus } : c));
-            await marketingDashboardService.updateCampaign(user.id, campaignId, { optimization_enabled: newStatus });
             
-            // Notify parent to log activity
+            const existingCampaign = campaigns.find(c => c.campaign_id === campaignId);
+            
+            // Need to check if it exists in local DB. If not, create it:
+            try {
+                 await marketingDashboardService.updateCampaign(user.id, campaignId, { optimization_enabled: newStatus });
+            } catch (err) {
+                 // Might not exist yet (as it came from webhook), so we insert
+                 if (existingCampaign) {
+                     const { optimization_enabled, ...rest } = existingCampaign;
+                     await marketingDashboardService.createCampaign(user.id, {
+                         ...rest,
+                         optimization_enabled: newStatus
+                     });
+                 }
+            }
+            
             if (onActionCompleted) {
                 const actionTitle = newStatus ? "Enabled Optimization" : "Disabled Optimization";
                 onActionCompleted(actionTitle, { campaignId });
             }
         } catch (error) {
             console.error('Error toggling optimization:', error);
-            // Revert changes on error
             loadCampaigns();
         }
     };
