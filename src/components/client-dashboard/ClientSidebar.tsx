@@ -28,7 +28,10 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
         { name: 'Analytics', path: '/dashboard/analytics', icon: BarChart3 },
     ];
 
-    const isManager = subscription?.plan_id === 'manager' || subscription?.plan_id === 'agency';
+    const managerEmails = ['7bd02025@gmail.com', 'jihadalcc@gmail.com'];
+    const isManager = subscription?.plan_id === 'manager' || 
+                      subscription?.plan_id === 'agency' || 
+                      (user?.email && managerEmails.includes(user.email));
 
     if (isManager) {
         navItems.push({ name: 'Bot Control', path: '/dashboard/bot-control', icon: Activity });

@@ -183,8 +183,8 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                 </button>
             </div>
             
-            <div className="overflow-x-auto bg-white rounded-2xl border border-gray-100 shadow-sm w-full">
-                <table className="w-full text-left border-collapse whitespace-nowrap">
+            <div className="overflow-x-auto bg-white rounded-2xl border border-gray-100 shadow-sm w-full custom-scrollbar">
+                <table className="w-full text-left border-collapse whitespace-nowrap min-w-[1100px]">
                     <thead className="bg-gray-50/80 text-gray-500 text-[11px] uppercase tracking-wider font-bold border-b border-gray-100">
                         <tr>
                             <th className="px-4 py-4">ID</th>

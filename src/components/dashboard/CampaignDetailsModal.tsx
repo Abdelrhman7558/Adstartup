@@ -12,13 +12,13 @@ export default function CampaignDetailsModal({ campaign, onClose }: CampaignDeta
     const { theme } = useTheme();
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 sm:p-6">
             <div
-                className={`w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+                className={`w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'
                     }`}
             >
-                {/* Header */}
-                <div className={`p-6 border-b flex items-center justify-between ${theme === 'dark' ? 'border-gray-700 bg-gray-900' : 'border-gray-100 bg-gray-50'
+                {/* Header - Fixed */}
+                <div className={`p-5 border-b flex items-center justify-between shrink-0 ${theme === 'dark' ? 'border-gray-700 bg-gray-900' : 'border-gray-100 bg-gray-50'
                     }`}>
                     <div>
                         <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
@@ -45,8 +45,8 @@ export default function CampaignDetailsModal({ campaign, onClose }: CampaignDeta
                     </button>
                 </div>
 
-                {/* Content */}
-                <div className="p-6">
+                {/* Content - Scrollable */}
+                <div className="p-6 overflow-y-auto custom-scrollbar">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
 
                         {/* Spend & Revenue */}
