@@ -13,6 +13,7 @@ export default function BotControlModule() {
   const [instruction, setInstruction] = useState('');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
   const [notifMessage, setNotifMessage] = useState('');
+  const [selectedActivityCampaign, setSelectedActivityCampaign] = useState<MarketingCampaign | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -173,9 +174,13 @@ export default function BotControlModule() {
               {campaigns.map(c => {
                   const lastLog = logs.find(l => l.campaign_id === c.campaign_id);
                   return (
-                    <tr key={c.campaign_id} className="hover:bg-gray-50 transition-colors">
+                    <tr 
+                      key={c.campaign_id} 
+                      onClick={() => setSelectedActivityCampaign(c)}
+                      className="hover:bg-red-50/30 transition-colors cursor-pointer group"
+                    >
                       <td className="px-6 py-4">
-                        <div className="font-bold text-gray-900">{c.campaign_name}</div>
+                        <div className="font-bold text-gray-900 group-hover:text-red-600 transition-colors">{c.campaign_name}</div>
                         <div className="text-xs text-gray-400">{c.account_name}</div>
                       </td>
                       <td className="px-6 py-4">
@@ -196,7 +201,7 @@ export default function BotControlModule() {
                             <span className="text-[10px] font-bold">{c.optimization_enabled ? 'Running' : 'Stopped'}</span>
                          </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                          <button 
                             onClick={() => handleToggleBot(c.campaign_id, !!c.optimization_enabled)}
                             className={`p-2 rounded-xl transition-colors ${c.optimization_enabled ? 'hover:bg-red-50 text-red-500' : 'hover:bg-green-50 text-green-500'}`}
@@ -318,6 +323,139 @@ export default function BotControlModule() {
           </div>
         </div>
       </div>
+
+      {/* Bot Activity Detail Modal */}
+      {selectedActivityCampaign && (
+         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 sm:p-6">
+            <div className="w-full max-w-2xl max-h-[85vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-gray-100 italic transition-all animate-in zoom-in-95 duration-200">
+                {/* Header */}
+                <div className="p-6 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+                    <div className="flex items-center gap-4">
+                        <div className="p-2.5 bg-red-100 rounded-xl">
+                            <BrainCircuit className="w-6 h-6 text-red-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-900">{selectedActivityCampaign.campaign_name}</h2>
+                            <p className="text-xs text-gray-500">Bot Activity & Decision Timeline</p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => setSelectedActivityCampaign(null)}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-400"
+                    >
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-white custom-scrollbar">
+                    {/* Bot State Card */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+                            <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Current ROAS</span>
+                            <span className="text-2xl font-bold text-gray-900">{selectedActivityCampaign.roas?.toFixed(2)}x</span>
+                        </div>
+                        <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+                             <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Bot Phase</span>
+                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                 logs.find(l => l.campaign_id === selectedActivityCampaign.campaign_id)?.bot_phase === 'scaling' ? 'bg-purple-100 text-purple-700' :
+                                 'bg-blue-100 text-blue-700'
+                             }`}>
+                                 {logs.find(l => l.campaign_id === selectedActivityCampaign.campaign_id)?.bot_phase || 'Active'}
+                             </span>
+                        </div>
+                        <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
+                             <span className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Optimization</span>
+                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${selectedActivityCampaign.optimization_enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                 {selectedActivityCampaign.optimization_enabled ? 'Running' : 'Stopped'}
+                             </span>
+                        </div>
+                    </div>
+
+                    {/* Timeline */}
+                    <div className="space-y-4">
+                        <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                             <History className="w-4 h-4 text-gray-400" />
+                             Decision History
+                        </h4>
+                        <div className="space-y-3 relative before:absolute before:left-3 before:top-4 before:bottom-4 before:w-0.5 before:bg-gray-100">
+                            {logs.filter(l => l.campaign_id === selectedActivityCampaign.campaign_id).length === 0 ? (
+                                <p className="text-sm text-gray-400 italic pl-8">No specific decisions logged for this campaign yet.</p>
+                            ) : (
+                                logs.filter(l => l.campaign_id === selectedActivityCampaign.campaign_id).map((log, idx) => (
+                                    <div key={log.id} className="relative pl-10 group">
+                                        <div className={`absolute left-1.5 top-2 w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm ring-4 ring-white z-10 ${
+                                            log.status === 'failed' ? 'bg-red-500' : 
+                                            log.action_type === 'scale' ? 'bg-purple-500' :
+                                            log.action_type === 'pause' ? 'bg-red-500' :
+                                            log.action_type === 'skip' ? 'bg-amber-500' : 'bg-blue-500'
+                                        }`} />
+                                        
+                                        <div className={`p-4 rounded-xl border ${
+                                            idx === 0 ? 'bg-gray-50 border-blue-100 ring-2 ring-blue-50/50' : 'bg-white border-gray-100'
+                                        }`}>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                                        log.action_type === 'scale' ? 'bg-purple-100 text-purple-700' :
+                                                        log.action_type === 'pause' ? 'bg-red-100 text-red-700' :
+                                                        'bg-gray-100 text-gray-700'
+                                                    }`}>
+                                                        {log.action_type}
+                                                    </span>
+                                                    {idx === 0 && <span className="bg-blue-600 text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-tight anime-pulse">Latest</span>}
+                                                </div>
+                                                <span className="text-[10px] text-gray-400">{new Date(log.created_at).toLocaleString()}</span>
+                                            </div>
+                                            <p className="text-sm font-bold text-gray-900 leading-tight mb-1">{log.reason || 'Routine Analysis'}</p>
+                                            {log.action_detail && (
+                                                <p className="text-xs text-gray-500 mt-1.5 border-t border-gray-50 pt-2 italic">{log.action_detail}</p>
+                                            )}
+                                            {log.status === 'failed' && (
+                                                <div className="mt-3 flex items-center gap-2 p-2 bg-red-50/50 rounded-lg border border-red-100">
+                                                    <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+                                                    <span className="text-[10px] font-bold text-red-700 uppercase">Error Detected</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+                    <button 
+                        onClick={() => setSelectedActivityCampaign(null)}
+                        className="px-6 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+                    >
+                        Close Details
+                    </button>
+                </div>
+            </div>
+         </div>
+      )}
     </div>
   );
 }
+
+function X(props: any) {
+  return (
+    <svg 
+      {...props} 
+      xmlns="http://www.w3.org/2000/svg" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
