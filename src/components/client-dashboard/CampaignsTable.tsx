@@ -250,16 +250,24 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                                     ${campaign.cost_per_lpv?.toFixed(2) || '—'}
                                 </td>
                                 <td className="px-2 py-3 text-center pr-6" onClick={(e) => e.stopPropagation()}>
-                                    <button 
-                                        onClick={(e) => handleToggleOptimization(campaign.campaign_id, !!campaign.optimization_enabled, e)}
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-                                            campaign.optimization_enabled ? 'bg-blue-600' : 'bg-gray-300'
-                                        }`}
-                                    >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${
-                                            campaign.optimization_enabled ? 'translate-x-5' : 'translate-x-0.5'
-                                        }`} />
-                                    </button>
+                                    <div className="flex flex-col items-center gap-1">
+                                        <button 
+                                            onClick={(e) => handleToggleOptimization(campaign.campaign_id, !!campaign.optimization_enabled, e)}
+                                            title={campaign.optimization_enabled ? 'Disable AI Optimizer' : 'Enable AI Optimizer'}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                                                campaign.optimization_enabled ? 'bg-blue-600' : 'bg-gray-300'
+                                            }`}
+                                        >
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform duration-200 ${
+                                                campaign.optimization_enabled ? 'translate-x-5' : 'translate-x-0.5'
+                                            }`} />
+                                        </button>
+                                        <span className={`text-[8px] font-bold uppercase tracking-widest ${
+                                            campaign.optimization_enabled ? 'text-blue-600' : 'text-gray-400'
+                                        }`}>
+                                            {campaign.optimization_enabled ? 'Running' : 'Off'}
+                                        </span>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
