@@ -29,13 +29,11 @@ export function ClientDashboardLayout({ children }: { children?: React.ReactNode
             />
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col min-h-screen transition-all duration-300 ease-in-out relative">
+            <div className="flex-1 flex flex-col min-h-screen min-w-0 bg-[#F8F9FA] relative">
                 <ClientHeader onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-                <main className="flex-1 overflow-x-hidden overflow-y-auto w-full">
-                    <div className="p-4 sm:p-6 lg:p-8 w-full">
-
-                        {/* Dynamic Tab Content injected here via React Router */}
+                <main className="flex-1 overflow-x-hidden overflow-y-auto">
+                    <div className="p-4 sm:p-6 lg:p-8 w-full max-w-full">
                         {children}
                     </div>
                 </main>
