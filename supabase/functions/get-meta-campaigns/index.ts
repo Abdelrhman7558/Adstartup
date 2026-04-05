@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
             throw new Error("Missing authorization header");
         }
 
-        const { userId } = await req.json() as CampaignRequest;
+        const { userId, datePreset = 'last_30d' } = await req.json() as { userId: string, datePreset?: string };
         if (!userId) {
             throw new Error("Missing userId");
         }
@@ -126,8 +126,9 @@ Deno.serve(async (req) => {
 
                     const fields = [
                         'id', 'name', 'status', 'objective', 'start_time', 'stop_time',
-                        'insights.date_preset(last_30d){impressions,clicks,spend,actions,action_values,purchase_roas,frequency,cpm,cost_per_action_type,date_start,date_stop}',
-                        'adsets.limit(1){daily_budget,lifetime_budget,start_time}',
+                        'daily_budget', 'lifetime_budget', 'budget_remaining', 'bid_strategy',
+                        `insights.date_preset(${datePreset}){impressions,clicks,spend,actions,action_values,purchase_roas,frequency,cpm,cost_per_action_type,date_start,date_stop}`,
+                        'adsets.limit(20){daily_budget,lifetime_budget,start_time,status}',
                         'ads.limit(1){creative{thumbnail_url,object_story_spec{link_data{image_hash,picture},video_data{video_id}}}}'
                     ].join(',');
 
@@ -181,9 +182,21 @@ Deno.serve(async (req) => {
                     const checkout_value = Number(insight.action_values?.find((a: any) => a.action_type === 'fb_pixel_initiate_checkout')?.value || 0);
 
                     // Extract daily budget (Meta returns in currency units * offset)
-                    const adset = campaign.adsets?.data?.[0];
-                    const dailyBudgetRaw = Number(adset?.daily_budget || 0);
-                    const lifetimeBudgetRaw = Number(adset?.lifetime_budget || 0);
+                    // Priority 1: Campaign Level Budget (CBO)
+                    let dailyBudgetRaw = Number(campaign.daily_budget || 0);
+                    let lifetimeBudgetRaw = Number(campaign.lifetime_budget || 0);
+                    
+                    // Priority 2: Sum of Adset Budgets (ABO) if Campaign budget is 0
+                    if (dailyBudgetRaw === 0 && lifetimeBudgetRaw === 0) {
+                        const activeAdsets = campaign.adsets?.data?.filter((a: any) => a.status === 'ACTIVE') || [];
+                        const targetAdsets = activeAdsets.length > 0 ? activeAdsets : (campaign.adsets?.data || []);
+                        
+                        targetAdsets.forEach((adset: any) => {
+                            dailyBudgetRaw += Number(adset.daily_budget || 0);
+                            lifetimeBudgetRaw += Number(adset.lifetime_budget || 0);
+                        });
+                    }
+
                     const daily_budget = dailyBudgetRaw > 0 ? dailyBudgetRaw / currencyOffset : (lifetimeBudgetRaw > 0 ? lifetimeBudgetRaw / currencyOffset / 30 : 0);
 
                     // Calculate runtime in days

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MarketingCampaign } from '../../lib/marketingDashboardService';
 import { useAuth } from '../../contexts/AuthContext';
-import { Loader2, Plus, Info } from 'lucide-react';
+import { Loader2, Plus, Calendar, Filter, Image as ImageIcon } from 'lucide-react';
 import { botControlService } from '../../lib/botControlService';
 import CampaignDetailsModal from '../dashboard/CampaignDetailsModal';
 import { Campaign } from '../../lib/dataTransformer';
@@ -16,14 +16,15 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
     const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedCampaign, setSelectedCampaign] = useState<MarketingCampaign | null>(null);
+    const [datePreset, setDatePreset] = useState('last_30d');
+    const [optimizationOnly, setOptimizationOnly] = useState(false);
 
     useEffect(() => {
         if (user) {
             loadCampaigns();
         }
-    }, [user]);
+    }, [user, datePreset]);
 
-    // Helper to get/set optimization preferences from localStorage
     const getOptimizationPrefs = (): Record<string, boolean> => {
         try {
             const key = `optimization_prefs_${user?.id}`;
@@ -42,19 +43,18 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
         if (!user) return;
         setLoading(true);
         try {
-            // Fetch live campaigns from webhook source
-            const liveData = await fetchDashboardData(user.id);
+            const liveData = await fetchDashboardData(user.id, datePreset);
             const liveCampaigns = [...(liveData.top_5_campaigns || []), ...(liveData.recent_campaigns || [])];
 
             const mergedMap = new Map<string, MarketingCampaign>();
 
-            // Add live campaigns
             liveCampaigns.forEach((liveC: any) => {
                  const mappedId = liveC.id || liveC.campaign_id;
                  if(!mappedId) return;
                  mergedMap.set(String(mappedId), {
                       campaign_id: String(mappedId),
                       campaign_name: liveC.name || liveC.campaign_name || 'Unnamed',
+                      thumbnail: liveC.thumbnail,
                       status: liveC.status || 'active',
                       spend: liveC.spend || 0,
                       revenue: liveC.revenue || 0,
@@ -77,11 +77,11 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                       date_stop: liveC.date_stop || liveC.end_time,
                       optimization_enabled: false,
                       account_name: liveC.account_name,
-                      ad_account_id: liveC.ad_account_id
+                      ad_account_id: liveC.ad_account_id,
+                      budget: liveC.budget || 0
                  } as MarketingCampaign);
             });
 
-            // Apply saved optimization preferences from localStorage
             const savedPrefs = getOptimizationPrefs();
             mergedMap.forEach((campaign, id) => {
                 if (id in savedPrefs) {
@@ -101,23 +101,15 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
         e.stopPropagation();
         if (!user) return;
         const newStatus = !currentStatus;
-
-        // Optimistic UI Update
         setCampaigns(prev => prev.map(c => c.campaign_id === campaignId ? { ...c, optimization_enabled: newStatus } : c));
-
-        // Persist to DB via botControlService
         botControlService.toggleOptimization(user.id, campaignId, newStatus).catch(err => {
             console.error('[CampaignsTable] Failed to sync toggle to DB:', err);
         });
-
-        // Still keep localStorage for immediate UX if needed, though DB is source of truth now
         const prefs = getOptimizationPrefs();
         prefs[campaignId] = newStatus;
         saveOptimizationPrefs(prefs);
-
         if (onActionCompleted) {
-            const actionTitle = newStatus ? "Enabled Optimization" : "Disabled Optimization";
-            onActionCompleted(actionTitle, { campaignId });
+            onActionCompleted(newStatus ? "Enabled Optimization" : "Disabled Optimization", { campaignId });
         }
     };
 
@@ -125,26 +117,20 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
         if (!user) return;
         const anyDisabled = campaigns.some(c => !c.optimization_enabled);
         const targetStatus = anyDisabled;
-
-        // Optimistic UI Update
         setCampaigns(prev => prev.map(c => ({ ...c, optimization_enabled: targetStatus })));
-
-        // Persist all to DB
         Promise.all(campaigns.map(c => botControlService.toggleOptimization(user.id, c.campaign_id, targetStatus)))
             .catch(err => console.error('[CampaignsTable] Failed to sync all toggles to DB:', err));
-
-        // Persist all to localStorage
         const prefs = getOptimizationPrefs();
         campaigns.forEach(c => { prefs[c.campaign_id] = targetStatus; });
         saveOptimizationPrefs(prefs);
-
         if (onActionCompleted) {
-            const actionTitle = targetStatus ? "Enabled Optimization for All Campaigns" : "Disabled Optimization for All Campaigns";
-            onActionCompleted(actionTitle, { count: campaigns.length });
+            onActionCompleted(targetStatus ? "Enabled All Optimization" : "Disabled All Optimization", { count: campaigns.length });
         }
     };
 
-    if (loading) {
+    const filteredCampaigns = campaigns.filter(c => optimizationOnly ? c.optimization_enabled : true);
+
+    if (loading && campaigns.length === 0) {
         return (
             <div className="flex justify-center items-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-red-500" />
@@ -152,31 +138,42 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
         );
     }
 
-    if (campaigns.length === 0) {
-        return (
-            <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                <p className="text-gray-500">No campaigns found. Start by creating one.</p>
-            </div>
-        );
-    }
-
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                        <Info className="w-5 h-5 text-blue-600" />
+            {/* Top Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <Calendar className="w-4 h-4 text-gray-500" />
+                        <select 
+                            value={datePreset}
+                            onChange={(e) => setDatePreset(e.target.value)}
+                            className="bg-transparent text-sm font-bold text-gray-700 focus:outline-none cursor-pointer"
+                        >
+                            <option value="last_7d">Last 7 Days</option>
+                            <option value="last_30d">Last 30 Days</option>
+                            <option value="this_month">This Month</option>
+                            <option value="last_month">Last Month</option>
+                            <option value="this_year">This Year</option>
+                        </select>
                     </div>
-                    <div>
-                        <h4 className="text-sm font-bold text-gray-900">Optimization & Scaling</h4>
-                        <p className="text-xs text-gray-600 mt-0.5">
-                            Automatically balance daily budgets, duplicate winning adsets, and stop losing ones.
-                        </p>
-                    </div>
+
+                    <button 
+                        onClick={() => setOptimizationOnly(!optimizationOnly)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                            optimizationOnly 
+                            ? 'bg-blue-50 border-blue-200 text-blue-600 font-bold' 
+                            : 'bg-white border-gray-200 text-gray-600 font-medium hover:bg-gray-50'
+                        }`}
+                    >
+                        <Filter className="w-4 h-4" />
+                        <span className="text-sm">Optimized Only</span>
+                    </button>
                 </div>
+
                 <button
                     onClick={handleToggleAll}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm"
                 >
                     <Plus className="w-4 h-4" />
                     Enable All Optimization
@@ -187,40 +184,50 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                 <table className="w-full text-left border-collapse whitespace-nowrap">
                     <thead className="bg-gray-50/80 text-gray-400 text-[10px] uppercase font-bold border-b border-gray-100">
                         <tr>
-                            <th className="px-2 py-3 text-left pl-6">Campaign / Account / ID</th>
-                            <th className="px-2 py-3 text-right">Budget</th>
+                            <th className="px-2 py-3 text-left pl-6">Campaign / Account</th>
+                            <th className="px-2 py-3 text-right">Daily Budget</th>
                             <th className="px-2 py-3 text-center">ROAS</th>
                             <th className="px-2 py-3 text-center">Freq</th>
                             <th className="px-2 py-3 text-center">CPM</th>
                             <th className="px-2 py-3 text-center">LPV</th>
                             <th className="px-2 py-3 text-center">Cost/LPV</th>
-                            <th className="px-2 py-3 text-center pr-6">Optimize</th>
+                            <th className="px-2 py-3 text-center pr-6">Bot</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {campaigns.map((campaign) => (
+                        {filteredCampaigns.map((campaign) => (
                             <tr 
                                 key={campaign.campaign_id} 
                                 onClick={() => setSelectedCampaign(campaign)}
                                 className="hover:bg-red-50/40 transition-colors cursor-pointer group border-b border-gray-50 last:border-0"
                             >
                                 <td className="px-2 py-3 pl-6">
-                                    <div className="flex flex-col gap-0.5">
-                                        <div className="text-[12px] font-bold text-gray-900 group-hover:text-red-600 transition-colors truncate max-w-[280px]">
-                                            {campaign.campaign_name}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] text-gray-400 font-mono tracking-tighter">ID: {campaign.campaign_id.slice(-6)}</span>
-                                            {campaign.account_name && (
-                                                <span className="text-[9px] font-bold text-blue-500 bg-blue-50 px-1 rounded uppercase tracking-tight">
-                                                    {campaign.account_name}
-                                                </span>
+                                    <div className="flex items-center gap-3">
+                                        {/* Campaign Thumbnail */}
+                                        <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                            {campaign.thumbnail ? (
+                                                <img src={campaign.thumbnail} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <ImageIcon className="w-5 h-5 text-gray-300" />
                                             )}
+                                        </div>
+                                        <div className="flex flex-col gap-0.5 min-w-0">
+                                            <div className="text-[12px] font-bold text-gray-900 group-hover:text-red-600 transition-colors truncate max-w-[240px]">
+                                                {campaign.campaign_name}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-gray-400 font-mono tracking-tighter">...{campaign.campaign_id.slice(-6)}</span>
+                                                {campaign.account_name && (
+                                                    <span className="text-[9px] font-bold text-blue-500 bg-blue-50 px-1 rounded uppercase tracking-tight truncate max-w-[100px]">
+                                                        {campaign.account_name}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
                                 <td className="px-2 py-3 text-[12px] text-gray-700 text-right font-bold">
-                                    ${(campaign.spend || 0).toFixed(2)}
+                                    ${(campaign.budget || 0).toFixed(2)}
                                 </td>
                                 <td className="px-2 py-3 text-center">
                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${

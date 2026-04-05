@@ -22,13 +22,23 @@ export interface BotInstruction {
 }
 
 export const botControlService = {
-  async fetchOptimizationLogs(userId: string): Promise<OptimizationLog[]> {
-    const { data, error } = await supabase
-      .from('optimization_logs')
-      .select('*')
-      .eq('user_id', userId)
+  async fetchOptimizationLogs(userId?: string): Promise<OptimizationLog[]> {
+    let query = supabase.from('optimization_logs').select('*');
+    if (userId) query = query.eq('user_id', userId);
+    
+    const { data, error } = await query
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(200);
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async fetchAllOptimizedCampaigns(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('meta_campaigns')
+      .select('*')
+      .eq('optimization_enabled', true);
 
     if (error) throw error;
     return data || [];
@@ -72,14 +82,5 @@ export const botControlService = {
       .eq('campaign_id', campaignId);
 
     if (error) throw error;
-    
-    // Also sync to the other campaigns table if needed
-    await supabase
-      .from('campaigns')
-      .update({
-        optimization_enabled: enabled
-      })
-      .eq('user_id', userId)
-      .eq('id', campaignId);
   }
 };

@@ -29,6 +29,9 @@ export interface MarketingCampaign {
   optimization_enabled?: boolean;
   account_name?: string;
   ad_account_id?: string;
+  thumbnail?: string;
+  budget?: number;
+  user_id?: string;
 }
 
 export interface MarketingAd {
@@ -108,7 +111,6 @@ export const marketingDashboardService = {
 
   async getInsights(userId: string): Promise<DashboardInsights> {
     const campaigns = await this.getCampaigns(userId);
-    const ads = await this.getAds(userId);
 
     const totalSpend = campaigns.reduce((sum, c) => sum + c.spend, 0);
     const totalRevenue = campaigns.reduce((sum, c) => sum + c.revenue, 0);

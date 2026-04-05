@@ -32,7 +32,7 @@ export async function fetchActiveCampaigns(userId: string): Promise<any[]> {
   }
 }
 
-export async function fetchDashboardData(userId: string): Promise<DashboardData> {
+export async function fetchDashboardData(userId: string, datePreset: string = 'last_30d'): Promise<DashboardData> {
   if (!userId) {
     console.error('[Dashboard] User ID is required');
     return DEFAULT_DASHBOARD_DATA;
@@ -71,8 +71,8 @@ export async function fetchDashboardData(userId: string): Promise<DashboardData>
     ] = await Promise.all([
       fetchSafeLegacy(MAIN_DATA_URL, 'Main Data'),
       fetchSafeLegacy(SALES_TREND_URL, 'Sales Trend'),
-      supabase.functions.invoke('get-meta-campaigns', { body: { userId } }),
-      supabase.functions.invoke('get-meta-insights', { body: { userId } })
+      supabase.functions.invoke('get-meta-campaigns', { body: { userId, datePreset } }),
+      supabase.functions.invoke('get-meta-insights', { body: { userId, datePreset } })
     ]);
 
     if (campaignsError) console.error('[Dashboard] get-meta-campaigns failed:', campaignsError);
