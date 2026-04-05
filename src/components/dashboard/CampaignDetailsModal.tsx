@@ -130,6 +130,107 @@ export default function CampaignDetailsModal({ campaign, onClose }: CampaignDeta
                                 ${campaign.cpa?.toFixed(2) || '-'}
                             </p>
                         </div>
+
+                        {/* Additional Metrics */}
+                        <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'border-gray-700 bg-gray-900/50' : 'border-gray-100 bg-gray-50'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <Activity className="w-4 h-4 text-pink-500" />
+                                <span className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Frequency</span>
+                            </div>
+                            <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                {campaign.frequency?.toFixed(2) || '-'}
+                            </p>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'border-gray-700 bg-gray-900/50' : 'border-gray-100 bg-gray-50'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <DollarSign className="w-4 h-4 text-emerald-500" />
+                                <span className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>CPM</span>
+                            </div>
+                            <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                ${campaign.cpm?.toFixed(2) || '-'}
+                            </p>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'border-gray-700 bg-gray-900/50' : 'border-gray-100 bg-gray-50'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <MousePointer className="w-4 h-4 text-amber-500" />
+                                <span className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>LPV</span>
+                            </div>
+                            <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                {campaign.landing_page_views?.toLocaleString() || '-'}
+                            </p>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'border-gray-700 bg-gray-900/50' : 'border-gray-100 bg-gray-50'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-bold text-gray-400">CP LPV</span>
+                                <span className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Cost Per LPV</span>
+                            </div>
+                            <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                ${campaign.cost_per_lpv?.toFixed(2) || '-'}
+                            </p>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'border-gray-700 bg-gray-900/50' : 'border-gray-100 bg-gray-50'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-bold text-gray-400">VC</span>
+                                <span className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>View Content Cost</span>
+                            </div>
+                            <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                ${campaign.content_view_cost?.toFixed(2) || '-'}
+                            </p>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'border-gray-700 bg-gray-900/50' : 'border-gray-100 bg-gray-50'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-bold text-gray-400">VC Val</span>
+                                <span className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>View Content Value</span>
+                            </div>
+                            <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                ${campaign.content_view_value?.toFixed(2) || '-'}
+                            </p>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'border-gray-700 bg-gray-900/50' : 'border-gray-100 bg-gray-50'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-bold text-gray-400">ATC</span>
+                                <span className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Add to Cart Cost</span>
+                            </div>
+                            <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                ${campaign.add_to_cart_cost?.toFixed(2) || '-'}
+                            </p>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'border-gray-700 bg-gray-900/50' : 'border-gray-100 bg-gray-50'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-bold text-gray-400">ATC Val</span>
+                                <span className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Add to Cart Value</span>
+                            </div>
+                            <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                ${campaign.add_to_cart_value?.toFixed(2) || '-'}
+                            </p>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'border-gray-700 bg-gray-900/50' : 'border-gray-100 bg-gray-50'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-bold text-gray-400">CH</span>
+                                <span className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Checkout Cost</span>
+                            </div>
+                            <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                ${campaign.checkout_cost?.toFixed(2) || '-'}
+                            </p>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'border-gray-700 bg-gray-900/50' : 'border-gray-100 bg-gray-50'}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-bold text-gray-400">CH Val</span>
+                                <span className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Checkout Value</span>
+                            </div>
+                            <p className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                                ${campaign.checkout_value?.toFixed(2) || '-'}
+                            </p>
+                        </div>
                     </div>
 
                     <div className={`mt-6 p-4 rounded-xl border ${theme === 'dark' ? 'border-gray-700 bg-gray-900/30' : 'border-gray-100 bg-gray-50'}`}>

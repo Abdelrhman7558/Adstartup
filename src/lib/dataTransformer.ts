@@ -10,6 +10,16 @@ export interface Campaign {
   ctr?: number;
   cpc?: number;
   cpa?: number;
+  frequency?: number;
+  cpm?: number;
+  landing_page_views?: number;
+  cost_per_lpv?: number;
+  content_view_cost?: number;
+  content_view_value?: number;
+  add_to_cart_cost?: number;
+  add_to_cart_value?: number;
+  checkout_cost?: number;
+  checkout_value?: number;
   date_start?: string;
   date_stop?: string;
   account_name?: string;
@@ -36,6 +46,16 @@ export interface RecentCampaign {
   ctr?: number;
   cpc?: number;
   cpa?: number;
+  frequency?: number;
+  cpm?: number;
+  landing_page_views?: number;
+  cost_per_lpv?: number;
+  content_view_cost?: number;
+  content_view_value?: number;
+  add_to_cart_cost?: number;
+  add_to_cart_value?: number;
+  checkout_cost?: number;
+  checkout_value?: number;
   date_start?: string;
   date_stop?: string;
   created_at?: string;
@@ -129,6 +149,16 @@ export function transformDashboardData(data: any): DashboardData {
     ctr: safeNumber(c.ctr),
     cpc: safeNumber(c.cpc),
     cpa: safeNumber(c.cpa),
+    frequency: safeNumber(c.frequency),
+    cpm: safeNumber(c.cpm),
+    landing_page_views: safeNumber(c.landing_page_views),
+    cost_per_lpv: safeNumber(c.cost_per_lpv),
+    content_view_cost: safeNumber(c.content_view_cost),
+    content_view_value: safeNumber(c.content_view_value),
+    add_to_cart_cost: safeNumber(c.add_to_cart_cost),
+    add_to_cart_value: safeNumber(c.add_to_cart_value),
+    checkout_cost: safeNumber(c.checkout_cost),
+    checkout_value: safeNumber(c.checkout_value),
     date_start: c.start_time || c.start_date || c.date_start || null,
     date_stop: c.end_time || c.end_date || c.stop_time || c.date_stop || null,
     created_at: c.created_at || new Date().toISOString(),
@@ -150,6 +180,16 @@ export function transformDashboardData(data: any): DashboardData {
       ctr: Number(c.ctr || 0),
       cpc: Number(c.cpc || 0),
       cpa: Number(c.cpa || 0),
+      frequency: Number(c.frequency || 0),
+      cpm: Number(c.cpm || 0),
+      landing_page_views: Number(c.landing_page_views || 0),
+      cost_per_lpv: Number(c.cost_per_lpv || 0),
+      content_view_cost: Number(c.content_view_cost || 0),
+      content_view_value: Number(c.content_view_value || 0),
+      add_to_cart_cost: Number(c.add_to_cart_cost || 0),
+      add_to_cart_value: Number(c.add_to_cart_value || 0),
+      checkout_cost: Number(c.checkout_cost || 0),
+      checkout_value: Number(c.checkout_value || 0),
       date_start: c.date_start || c.start_time || null,
       date_stop: c.date_stop || c.end_time || null,
       account_name: c.account_name,

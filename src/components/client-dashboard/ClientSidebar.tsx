@@ -19,7 +19,7 @@ interface SidebarProps {
 }
 
 export function ClientSidebar({ isOpen }: SidebarProps) {
-    const { profile, user } = useAuth();
+    const { profile, user, subscription } = useAuth();
 
     const navItems = [
         { name: 'Overview', path: '/dashboard/overview', icon: LayoutDashboard },
@@ -27,6 +27,12 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
         { name: 'Campaign', path: '/dashboard/campaigns', icon: Megaphone },
         { name: 'Analytics', path: '/dashboard/analytics', icon: BarChart3 },
     ];
+
+    const isManager = subscription?.plan_id === 'manager' || subscription?.plan_id === 'agency';
+
+    if (isManager) {
+        navItems.push({ name: 'Bot Control', path: '/dashboard/bot-control', icon: Activity });
+    }
 
 
     const bottomItems = [

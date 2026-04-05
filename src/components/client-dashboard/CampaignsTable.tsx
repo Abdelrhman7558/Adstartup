@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MarketingCampaign } from '../../lib/marketingDashboardService';
 import { useAuth } from '../../contexts/AuthContext';
 import { Loader2, Plus, Info } from 'lucide-react';
+import { botControlService } from '../../lib/botControlService';
 import CampaignDetailsModal from '../dashboard/CampaignDetailsModal';
 import { Campaign } from '../../lib/dataTransformer';
 import { fetchDashboardData } from '../../lib/dashboardDataService';
@@ -62,6 +63,16 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                       clicks: liveC.clicks || 0,
                       ctr: liveC.ctr || 0,
                       conversion: 0,
+                      frequency: liveC.frequency,
+                      cpm: liveC.cpm,
+                      landing_page_views: liveC.landing_page_views,
+                      cost_per_lpv: liveC.cost_per_lpv,
+                      content_view_cost: liveC.content_view_cost,
+                      content_view_value: liveC.content_view_value,
+                      add_to_cart_cost: liveC.add_to_cart_cost,
+                      add_to_cart_value: liveC.add_to_cart_value,
+                      checkout_cost: liveC.checkout_cost,
+                      checkout_value: liveC.checkout_value,
                       date_start: liveC.date_start || liveC.start_time,
                       date_stop: liveC.date_stop || liveC.end_time,
                       optimization_enabled: false,
@@ -94,7 +105,12 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
         // Optimistic UI Update
         setCampaigns(prev => prev.map(c => c.campaign_id === campaignId ? { ...c, optimization_enabled: newStatus } : c));
 
-        // Persist to localStorage (reliable, works immediately)
+        // Persist to DB via botControlService
+        botControlService.toggleOptimization(user.id, campaignId, newStatus).catch(err => {
+            console.error('[CampaignsTable] Failed to sync toggle to DB:', err);
+        });
+
+        // Still keep localStorage for immediate UX if needed, though DB is source of truth now
         const prefs = getOptimizationPrefs();
         prefs[campaignId] = newStatus;
         saveOptimizationPrefs(prefs);
@@ -112,6 +128,10 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
 
         // Optimistic UI Update
         setCampaigns(prev => prev.map(c => ({ ...c, optimization_enabled: targetStatus })));
+
+        // Persist all to DB
+        Promise.all(campaigns.map(c => botControlService.toggleOptimization(user.id, c.campaign_id, targetStatus)))
+            .catch(err => console.error('[CampaignsTable] Failed to sync all toggles to DB:', err));
 
         // Persist all to localStorage
         const prefs = getOptimizationPrefs();
@@ -174,6 +194,10 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                             <th className="px-4 py-4 text-center">Start Time</th>
                             <th className="px-4 py-4 text-center">End Time</th>
                             <th className="px-4 py-4 text-center">ROAS</th>
+                            <th className="px-4 py-4 text-center">Freq</th>
+                            <th className="px-4 py-4 text-center">CPM</th>
+                            <th className="px-4 py-4 text-center">LPV</th>
+                            <th className="px-4 py-4 text-center">Cost/LPV</th>
                             <th className="px-4 py-4 text-center">Optimize</th>
                         </tr>
                     </thead>
@@ -212,6 +236,18 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                                         {campaign.roas.toFixed(2)}x
                                     </span>
                                 </td>
+                                <td className="px-4 py-4 text-sm text-gray-600 font-medium text-center">
+                                    {campaign.frequency?.toFixed(2) || '—'}
+                                </td>
+                                <td className="px-4 py-4 text-sm text-gray-600 font-medium text-center">
+                                    ${campaign.cpm?.toFixed(2) || '—'}
+                                </td>
+                                <td className="px-4 py-4 text-sm text-gray-600 font-medium text-center">
+                                    {campaign.landing_page_views || '—'}
+                                </td>
+                                <td className="px-4 py-4 text-sm text-gray-600 font-medium text-center">
+                                    ${campaign.cost_per_lpv?.toFixed(2) || '—'}
+                                </td>
                                 <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
                                     <button 
                                         onClick={(e) => handleToggleOptimization(campaign.campaign_id, !!campaign.optimization_enabled, e)}
@@ -244,6 +280,16 @@ export function CampaignsTable({ onActionCompleted }: CampaignsTableProps) {
                         ctr: selectedCampaign.ctr,
                         cpc: undefined,
                         cpa: undefined,
+                        frequency: selectedCampaign.frequency,
+                        cpm: selectedCampaign.cpm,
+                        landing_page_views: selectedCampaign.landing_page_views,
+                        cost_per_lpv: selectedCampaign.cost_per_lpv,
+                        content_view_cost: selectedCampaign.content_view_cost,
+                        content_view_value: selectedCampaign.content_view_value,
+                        add_to_cart_cost: selectedCampaign.add_to_cart_cost,
+                        add_to_cart_value: selectedCampaign.add_to_cart_value,
+                        checkout_cost: selectedCampaign.checkout_cost,
+                        checkout_value: selectedCampaign.checkout_value,
                         date_start: selectedCampaign.date_start,
                         date_stop: selectedCampaign.date_stop,
                     } as Campaign} 

@@ -12,6 +12,16 @@ export interface MarketingCampaign {
   clicks: number;
   ctr: number;
   conversion: number;
+  frequency?: number;
+  cpm?: number;
+  landing_page_views?: number;
+  cost_per_lpv?: number;
+  content_view_cost?: number;
+  content_view_value?: number;
+  add_to_cart_cost?: number;
+  add_to_cart_value?: number;
+  checkout_cost?: number;
+  checkout_value?: number;
   date_start?: string;
   date_stop?: string;
   top_country?: string;

@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
 
                     const fields = [
                         'id', 'name', 'status', 'objective', 'start_time', 'stop_time',
-                        'insights.date_preset(last_30d){impressions,clicks,spend,actions,action_values,purchase_roas,date_start,date_stop}',
+                        'insights.date_preset(last_30d){impressions,clicks,spend,actions,action_values,purchase_roas,frequency,cpm,cost_per_action_type,date_start,date_stop}',
                         'adsets.limit(1){daily_budget,lifetime_budget,start_time}',
                         'ads.limit(1){creative{thumbnail_url,object_story_spec{link_data{image_hash,picture},video_data{video_id}}}}'
                     ].join(',');
@@ -164,6 +164,21 @@ Deno.serve(async (req) => {
                         insight.actions?.find((a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || 0
                     );
                     const cpa = purchases > 0 ? spend / purchases : 0;
+
+                    // New metrics mapping
+                    const frequency = Number(insight.frequency || 0);
+                    const cpm = Number(insight.cpm || 0);
+                    const landing_page_views = Number(insight.actions?.find((a: any) => a.action_type === 'landing_page_view')?.value || 0);
+                    const cost_per_lpv = Number(insight.cost_per_action_type?.find((a: any) => a.action_type === 'landing_page_view')?.value || 0);
+                    
+                    const content_view_cost = Number(insight.cost_per_action_type?.find((a: any) => a.action_type === 'fb_pixel_view_content')?.value || 0);
+                    const content_view_value = Number(insight.action_values?.find((a: any) => a.action_type === 'fb_pixel_view_content')?.value || 0);
+                    
+                    const add_to_cart_cost = Number(insight.cost_per_action_type?.find((a: any) => a.action_type === 'fb_pixel_add_to_cart')?.value || 0);
+                    const add_to_cart_value = Number(insight.action_values?.find((a: any) => a.action_type === 'fb_pixel_add_to_cart')?.value || 0);
+                    
+                    const checkout_cost = Number(insight.cost_per_action_type?.find((a: any) => a.action_type === 'fb_pixel_initiate_checkout')?.value || 0);
+                    const checkout_value = Number(insight.action_values?.find((a: any) => a.action_type === 'fb_pixel_initiate_checkout')?.value || 0);
 
                     // Extract daily budget (Meta returns in currency units * offset)
                     const adset = campaign.adsets?.data?.[0];
@@ -203,6 +218,16 @@ Deno.serve(async (req) => {
                         ctr: Number(ctr.toFixed(2)),
                         cpc: Number(cpc.toFixed(2)),
                         cpa: Number(cpa.toFixed(2)),
+                        frequency: Number(frequency.toFixed(2)),
+                        cpm: Number(cpm.toFixed(2)),
+                        landing_page_views,
+                        cost_per_lpv: Number(cost_per_lpv.toFixed(2)),
+                        content_view_cost: Number(content_view_cost.toFixed(2)),
+                        content_view_value: Number(content_view_value.toFixed(2)),
+                        add_to_cart_cost: Number(add_to_cart_cost.toFixed(2)),
+                        add_to_cart_value: Number(add_to_cart_value.toFixed(2)),
+                        checkout_cost: Number(checkout_cost.toFixed(2)),
+                        checkout_value: Number(checkout_value.toFixed(2)),
                         runtime,
                         date_start: insight.date_start || null,
                         date_stop: insight.date_stop || null,
@@ -252,6 +277,16 @@ Deno.serve(async (req) => {
                     ctr: c.ctr,
                     cpc: c.cpc,
                     cpa: c.cpa,
+                    frequency: c.frequency,
+                    cpm: c.cpm,
+                    landing_page_views: c.landing_page_views,
+                    cost_per_lpv: c.cost_per_lpv,
+                    content_view_cost: c.content_view_cost,
+                    content_view_value: c.content_view_value,
+                    add_to_cart_cost: c.add_to_cart_cost,
+                    add_to_cart_value: c.add_to_cart_value,
+                    checkout_cost: c.checkout_cost,
+                    checkout_value: c.checkout_value,
                     start_date: c.start_date,
                     end_date: c.end_date,
                     last_fetched_at: new Date().toISOString()
