@@ -11,6 +11,7 @@ const CampaignModule = React.lazy(() => import('../components/client-dashboard/m
 const IntegrationModule = React.lazy(() => import('../components/client-dashboard/modules/IntegrationModule'));
 const SettingsModule = React.lazy(() => import('../components/client-dashboard/modules/SettingsModule'));
 const BotControlModule = React.lazy(() => import('../components/client-dashboard/BotControlModule'));
+const AssetsModule = React.lazy(() => import('../components/client-dashboard/modules/AssetsModule'));
 
 // Fallbacks for loading states
 const PageLoader = () => (
@@ -32,6 +33,7 @@ export default function ClientDashboard() {
                         <Route path="integration" element={<IntegrationModule />} />
                         <Route path="settings" element={<SettingsModule />} />
                         <Route path="bot-control" element={<BotControlModule />} />
+                        <Route path="assets" element={<AssetsModule />} />
                         <Route path="*" element={<Navigate to="overview" replace />} />
                     </Routes>
                 </Suspense>

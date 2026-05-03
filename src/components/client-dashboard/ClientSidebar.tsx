@@ -8,7 +8,8 @@ import {
     Target,
     CalendarDays,
     Activity,
-    Users
+    Users,
+    UploadCloud,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
@@ -27,6 +28,7 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
         { name: 'Overview', path: '/dashboard/overview', icon: LayoutDashboard },
         { name: 'Integration', path: '/dashboard/integration', icon: LinkIcon },
         { name: 'Campaign', path: '/dashboard/campaigns', icon: Megaphone },
+        { name: 'Assets', path: '/dashboard/assets', icon: UploadCloud },
         { name: 'Analytics', path: '/dashboard/analytics', icon: BarChart3 },
     ];
 

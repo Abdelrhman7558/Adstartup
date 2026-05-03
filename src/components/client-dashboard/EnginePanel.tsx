@@ -3,7 +3,7 @@
 // existing UI keeps working while we migrate.
 
 import { useEffect, useState } from 'react';
-import { Loader2, Play, ShieldCheck, Activity, History, AlertTriangle, Check, X, Send, MessageSquare } from 'lucide-react';
+import { Loader2, Play, ShieldCheck, Activity, History, AlertTriangle, Check, X, Send, MessageSquare, Plus } from 'lucide-react';
 import {
   AgentAction,
   BotRun,
@@ -121,7 +121,7 @@ export default function EnginePanel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Optimization Engine</h2>
           <p className="text-sm text-gray-500">
@@ -129,7 +129,12 @@ export default function EnginePanel() {
             {errorCount > 0 ? `${errorCount} errors in last 10 runs` : 'all good'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => window.dispatchEvent(new Event('openNewCampaignModal'))}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700">
+            <Plus className="w-4 h-4" /> Create Campaign
+          </button>
           <button
             disabled={!!busy}
             onClick={() => trigger('DAILY_ROUTINE', true)}
