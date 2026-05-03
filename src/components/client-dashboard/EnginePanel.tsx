@@ -3,7 +3,7 @@
 // existing UI keeps working while we migrate.
 
 import { useEffect, useState } from 'react';
-import { Loader2, Play, ShieldCheck, Activity, History, AlertTriangle } from 'lucide-react';
+import { Loader2, Play, ShieldCheck, Activity, History, AlertTriangle, Check, X, Send, MessageSquare } from 'lucide-react';
 import {
   AgentAction,
   BotRun,
@@ -34,22 +34,64 @@ export default function EnginePanel() {
   const [busy, setBusy] = useState<null | string>(null);
   const [runs, setRuns] = useState<BotRun[]>([]);
   const [actions, setActions] = useState<AgentAction[]>([]);
+  const [pending, setPending] = useState<AgentAction[]>([]);
   const [states, setStates] = useState<CampaignStateRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatSending, setChatSending] = useState(false);
+  const [chatLog, setChatLog] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
 
   const reload = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const [runsRows, actionRows, stateRows] = await Promise.all([
-        isManagerOrAdmin ? botControlService.fetchRecentRuns(50) : botControlService.fetchRecentRuns(15),
-        botControlService.fetchAgentActions(isManagerOrAdmin ? undefined : user.id, 50),
-        botControlService.fetchCampaignStates(isManagerOrAdmin ? undefined : user.id),
+      const userScope = isManagerOrAdmin ? undefined : user.id;
+      const [runsRows, actionRows, pendingRows, stateRows] = await Promise.all([
+        botControlService.fetchRecentRuns(isManagerOrAdmin ? 50 : 15),
+        botControlService.fetchAgentActions(userScope, 50),
+        botControlService.fetchPendingActions(userScope),
+        botControlService.fetchCampaignStates(userScope),
       ]);
-      setRuns(runsRows); setActions(actionRows); setStates(stateRows);
+      setRuns(runsRows); setActions(actionRows); setPending(pendingRows); setStates(stateRows);
     } catch (e: any) {
       setError(e?.message ?? String(e));
     } finally { setLoading(false); }
+  };
+
+  const handleApprove = async (id: string) => {
+    setBusy(`approve-${id}`); setError(null);
+    try {
+      const r = await botControlService.approveAction(id);
+      if (!r.ok) setError(r.error ?? 'Action failed');
+      await reload();
+    } catch (e: any) {
+      setError(e?.message ?? String(e));
+    } finally { setBusy(null); }
+  };
+
+  const handleReject = async (id: string) => {
+    setBusy(`reject-${id}`); setError(null);
+    try {
+      await botControlService.rejectAction(id);
+      await reload();
+    } catch (e: any) {
+      setError(e?.message ?? String(e));
+    } finally { setBusy(null); }
+  };
+
+  const handleChatSend = async () => {
+    if (!chatInput.trim()) return;
+    const msg = chatInput.trim();
+    setChatLog(c => [...c, { role: 'user', text: msg }]);
+    setChatInput(''); setChatSending(true);
+    try {
+      const r = await botControlService.chatWithAI(msg);
+      setChatLog(c => [...c, { role: 'ai', text: r.reply || '(no reply)' }]);
+      if (r.dispatched && r.dispatched.length) await reload();
+    } catch (e: any) {
+      setChatLog(c => [...c, { role: 'ai', text: `Error: ${e?.message ?? String(e)}` }]);
+    } finally { setChatSending(false); }
   };
 
   useEffect(() => { reload(); }, [user?.id, isManagerOrAdmin]);
@@ -123,6 +165,96 @@ export default function EnginePanel() {
         <Stat icon={<History  className="w-4 h-4" />} label="Actions (last 50)"  value={totalActions} />
         <Stat icon={<ShieldCheck className="w-4 h-4" />} label="In Dry-Run"     value={inDryRun} />
         <Stat icon={<AlertTriangle className="w-4 h-4" />} label="Errors (last 10 runs)" value={errorCount} />
+      </div>
+
+      {/* Pending Approvals — actions Claude proposed but waiting on user OK */}
+      <div className="bg-white rounded-2xl border-2 border-amber-200 p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-gray-900">Pending Approvals</h3>
+            <p className="text-sm text-gray-500">Bot recommendations waiting for you to approve.</p>
+          </div>
+          <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-sm font-medium border border-amber-200">
+            {pending.length} pending
+          </span>
+        </div>
+        {pending.length === 0 ? (
+          <div className="text-center py-8 text-gray-400 text-sm">No pending bot recommendations. Ask the AI in the chat below or trigger a run.</div>
+        ) : (
+          <div className="space-y-2">
+            {pending.map(p => (
+              <div key={p.id} className="flex items-start justify-between gap-3 p-3 rounded-lg border border-gray-100 bg-amber-50/30">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-gray-100">{p.rule_id ?? '—'}</span>
+                    <span className="font-bold text-gray-900">{p.action}</span>
+                    <span className="text-xs text-gray-500">on {p.campaign_id}</span>
+                  </div>
+                  {p.reason && <p className="text-sm text-gray-700 mt-1">{p.reason}</p>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    disabled={busy === `approve-${p.id}` || busy === `reject-${p.id}`}
+                    onClick={() => handleApprove(p.id)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+                    {busy === `approve-${p.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    Approve
+                  </button>
+                  <button
+                    disabled={busy === `approve-${p.id}` || busy === `reject-${p.id}`}
+                    onClick={() => handleReject(p.id)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                    {busy === `reject-${p.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* AI Chat — talk to Claude, ask it to propose actions */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <button
+          className="flex items-center gap-2 font-bold text-gray-900 mb-2"
+          onClick={() => setChatOpen(o => !o)}>
+          <MessageSquare className="w-5 h-5" /> Ask the AI Media Buyer
+          <span className="text-xs text-gray-500 font-normal">({chatOpen ? 'hide' : 'show'})</span>
+        </button>
+        {chatOpen && (
+          <>
+            <div className="space-y-2 max-h-72 overflow-y-auto mb-3 p-3 bg-gray-50 rounded-lg">
+              {chatLog.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-6">
+                  Ask things like: "اعمل حملة جديدة عشان منتج X" أو "شوف حملاتي وقولي إيه اللي محتاج يتظبط"
+                </p>
+              )}
+              {chatLog.map((m, i) => (
+                <div key={i} className={`p-2 rounded-lg text-sm ${m.role === 'user' ? 'bg-blue-50 ml-8' : 'bg-white border mr-8'}`}>
+                  <div className="text-xs text-gray-500 mb-1">{m.role === 'user' ? 'You' : 'AI'}</div>
+                  <div className="whitespace-pre-wrap">{m.text}</div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) handleChatSend(); }}
+                placeholder="اكتب سؤالك..."
+                className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" />
+              <button
+                disabled={chatSending || !chatInput.trim()}
+                onClick={handleChatSend}
+                className="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 disabled:opacity-50">
+                {chatSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Send
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">

@@ -176,4 +176,36 @@ export const botControlService = {
     if (error) throw error;
     return data;
   },
+
+  async fetchPendingActions(userId?: string): Promise<AgentAction[]> {
+    let q = supabase.from('agent_actions').select('*').eq('status', 'pending');
+    if (userId) q = q.eq('user_id', userId);
+    const { data, error } = await q.order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as AgentAction[];
+  },
+
+  async approveAction(actionId: string): Promise<{ ok: boolean; status: string; meta_response?: unknown; error?: string }> {
+    const { data, error } = await supabase.functions.invoke('execute-pending-action', {
+      body: { action_id: actionId, decision: 'approve' },
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async rejectAction(actionId: string, note?: string): Promise<{ ok: boolean; status: string }> {
+    const { data, error } = await supabase.functions.invoke('execute-pending-action', {
+      body: { action_id: actionId, decision: 'reject', note },
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async chatWithAI(message: string, campaignId?: string): Promise<{ reply: string; tools_used: any[]; dispatched: any[] }> {
+    const { data, error } = await supabase.functions.invoke('ai-media-buyer', {
+      body: { message, campaign_id: campaignId },
+    });
+    if (error) throw error;
+    return data;
+  },
 };

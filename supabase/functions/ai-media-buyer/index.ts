@@ -47,7 +47,9 @@ const TOOLS = [
           action: {
             type: 'string',
             enum: [
+              // Existing optimization / scale actions
               'pause_ad','pause_adset','pause_and_refresh_creative',
+              'pause_campaign','resume_campaign','delete_campaign',
               'increase_budget','decrease_budget',
               'duplicate_to_winners','flag_clear_winner','duplicate_winning_format',
               'apply_min_spend_floor','reduce_min_spend',
@@ -58,6 +60,8 @@ const TOOLS = [
               'launch_new_creative_variants','add_to_winners_and_scale','expand_audience',
               'reject_action','block_action',
               'use_attribution_window','output_insufficient_data',
+              // New: lifecycle creation
+              'create_campaign',
             ],
           },
           campaign_id: { type: 'string' },
@@ -65,6 +69,32 @@ const TOOLS = [
           ad_id: { type: 'string' },
           params: { type: 'object', description: 'Action params, e.g. {"pct": 20}' },
           reason: { type: 'string', description: 'Concise justification quoting the metrics that triggered the rule.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'propose_campaign',
+      description: 'Propose a NEW campaign for the operator to approve. Stored as a pending agent_action. When approved, creates the actual campaign on Meta via create-meta-campaign and auto-enrolls it into the optimization cycle.',
+      parameters: {
+        type: 'object',
+        required: ['campaign_name', 'objective', 'daily_budget', 'reason'],
+        properties: {
+          campaign_name: { type: 'string' },
+          objective: { type: 'string', enum: ['OUTCOME_SALES','OUTCOME_LEADS','OUTCOME_TRAFFIC','OUTCOME_AWARENESS','OUTCOME_ENGAGEMENT','OUTCOME_APP_PROMOTION'] },
+          goal: { type: 'string', description: 'Free text goal (e.g. "Generate first 100 purchases at <$25 CPA")' },
+          daily_budget: { type: 'number', description: 'In account currency, e.g. 50 for $50/day' },
+          currency: { type: 'string', description: 'ISO code, e.g. USD, EGP' },
+          start_time: { type: 'string', description: 'ISO datetime, e.g. 2026-05-04T09:00:00Z' },
+          end_time:   { type: 'string', description: 'Optional ISO datetime' },
+          description:{ type: 'string', description: 'Ad copy / messaging' },
+          offer:      { type: 'string', description: 'Optional discount or offer text' },
+          asset_type: { type: 'string', enum: ['catalog','upload'] },
+          asset_ids:  { type: 'array', items: { type: 'string' }, description: 'IDs from user_assets to reuse, OR empty for catalog campaigns.' },
+          catalog_id: { type: 'string' },
+          reason:     { type: 'string', description: 'Why this campaign now? Reference rules, the brief, or recent winner data.' },
         },
       },
     },
@@ -229,6 +259,47 @@ Deno.serve(async (req) => {
           status: 'pending',
         }).select().maybeSingle();
         dispatched.push({ tool: 'recommend_action', result: ins.data });
+      } else if (name === 'propose_campaign') {
+        // Pull connection so we can record meta_connection in the params.
+        // The `execute-pending-action` handler forwards these to create-meta-campaign.
+        const { data: conn } = await supabase
+          .from('meta_connections').select('*').eq('user_id', user.id).maybeSingle();
+        const meta_connection = conn ? {
+          ad_account_id: conn.ad_account_id,
+          page_id: conn.page_id,
+          pixel_id: conn.pixel_id,
+          instagram_actor_id: conn.instagram_actor_id,
+          catalog_id: conn.catalog_id,
+        } : {};
+
+        const params = {
+          campaign_name: args.campaign_name,
+          objective: args.objective,
+          goal: args.goal ?? '',
+          daily_budget: args.daily_budget,
+          currency: args.currency ?? 'USD',
+          start_time: args.start_time ?? new Date(Date.now() + 60_000).toISOString(),
+          end_time: args.end_time ?? null,
+          description: args.description ?? '',
+          offer: args.offer ?? null,
+          asset_type: args.asset_type ?? 'upload',
+          asset_ids: args.asset_ids ?? [],
+          catalog_id: args.catalog_id ?? null,
+          meta_connection,
+          agent_mode: 'ai_media_buyer',
+        };
+
+        const ins = await supabase.from('agent_actions').insert({
+          user_id: user.id,
+          campaign_id: 'PENDING_CREATE', // placeholder until campaign is actually created
+          rule_id: 'AI.create',
+          action: 'create_campaign',
+          action_params: params,
+          reason: args.reason,
+          dry_run: true,
+          status: 'pending',
+        }).select().maybeSingle();
+        dispatched.push({ tool: 'propose_campaign', result: ins.data });
       }
     }
 
