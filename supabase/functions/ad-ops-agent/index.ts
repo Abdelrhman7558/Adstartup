@@ -58,8 +58,15 @@ Deno.serve(async (req: Request) => {
             return new Response(JSON.stringify({ error: 'Messages array required' }), { status: 400, headers: corsHeaders });
         }
 
-        // 4. Call OpenRouter API
-        const openRouterKey = Deno.env.get('OPENROUTER_API_KEY') || "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";
+        // 4. Call OpenRouter API — no hardcoded fallback. Fail loud if the secret is missing.
+        const openRouterKey = Deno.env.get('OPENROUTER_API_KEY');
+        if (!openRouterKey) {
+            console.error('[AdOpsAgent] OPENROUTER_API_KEY is not configured');
+            return new Response(
+                JSON.stringify({ error: 'AI agent is not configured. Contact support.' }),
+                { status: 503, headers: corsHeaders }
+            );
+        }
 
         // Prepend System Prompt
         const conversation = [

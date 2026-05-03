@@ -4,9 +4,12 @@ import { Loader2, Bot, ShieldCheck, AlertCircle, History, Send, MessageSquare, P
 import { botControlService, OptimizationLog } from '../../lib/botControlService';
 import { fetchDashboardData } from '../../lib/dashboardDataService';
 import { MarketingCampaign } from '../../lib/marketingDashboardService';
+import { useUserRole } from '../../lib/useUserRole';
+import EnginePanel from './EnginePanel';
 
 export default function BotControlModule() {
   const { user } = useAuth();
+  const { isManagerOrAdmin: isManager, loading: roleLoading } = useUserRole();
   const [loading, setLoading] = useState(true);
   const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
   const [logs, setLogs] = useState<OptimizationLog[]>([]);
@@ -15,13 +18,11 @@ export default function BotControlModule() {
   const [notifMessage, setNotifMessage] = useState('');
   const [selectedActivityCampaign, setSelectedActivityCampaign] = useState<any | null>(null);
 
-  const isManager = user?.email && ['7bd02025@gmail.com', 'jihadalcc@gmail.com'].includes(user.email);
-
   useEffect(() => {
-    if (user) {
+    if (user && !roleLoading) {
       loadData();
     }
-  }, [user]);
+  }, [user, roleLoading, isManager]);
 
   const loadData = async () => {
     if (!user) return;
@@ -124,6 +125,9 @@ export default function BotControlModule() {
 
   return (
     <div className="space-y-8 pb-12">
+      {/* New Optimization Engine V2 panel — runs alongside the legacy view. */}
+      <EnginePanel />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

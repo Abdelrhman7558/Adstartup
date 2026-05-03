@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, Profile, Subscription, Brief, UserState, MetaConnection } from '../lib/supabase';
 import { PRODUCTION_DOMAIN } from '../lib/domainValidation';
+import { refreshManagerStatusForUser } from '../lib/managerPlanService';
 
 interface AuthContextType {
   user: User | null;
@@ -108,12 +109,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadUserData = async (userId: string) => {
     try {
+      const currentEmail = (await supabase.auth.getUser()).data.user?.email ?? null;
       await Promise.all([
         loadProfile(userId),
         loadUserState(userId),
         loadSubscription(userId),
         loadBrief(userId),
         loadMetaConnection(userId),
+        refreshManagerStatusForUser(userId, currentEmail),
       ]);
     } catch (error) {
       console.error('Error loading user data:', error);

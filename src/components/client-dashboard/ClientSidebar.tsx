@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
+import { useUserRole } from '../../lib/useUserRole';
 
 interface SidebarProps {
     isOpen: boolean;
@@ -20,6 +21,7 @@ interface SidebarProps {
 
 export function ClientSidebar({ isOpen }: SidebarProps) {
     const { profile, user, subscription } = useAuth();
+    const { isManagerOrAdmin } = useUserRole();
 
     const navItems = [
         { name: 'Overview', path: '/dashboard/overview', icon: LayoutDashboard },
@@ -28,10 +30,9 @@ export function ClientSidebar({ isOpen }: SidebarProps) {
         { name: 'Analytics', path: '/dashboard/analytics', icon: BarChart3 },
     ];
 
-    const managerEmails = ['7bd02025@gmail.com', 'jihadalcc@gmail.com'];
-    const isManager = subscription?.plan_id === 'manager' || 
-                      subscription?.plan_id === 'agency' || 
-                      (user?.email && managerEmails.includes(user.email));
+    const isManager = isManagerOrAdmin
+                   || subscription?.plan_id === 'manager'
+                   || subscription?.plan_id === 'agency';
 
     if (isManager) {
         navItems.push({ name: 'Bot Control', path: '/dashboard/bot-control', icon: Activity });

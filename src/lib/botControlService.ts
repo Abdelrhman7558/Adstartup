@@ -21,6 +21,54 @@ export interface BotInstruction {
     created_at: string;
 }
 
+export interface BotRun {
+  id: string;
+  trigger: 'cron' | 'manual' | 'webhook' | 'new_campaign';
+  scope: 'all' | 'user' | 'campaign';
+  scope_target: string | null;
+  mode: 'DAILY_ROUTINE' | 'OPTIMIZE_CYCLE' | 'SCALE_CHECK' | 'GUARDRAIL' | 'MANUAL';
+  dry_run: boolean;
+  started_at: string;
+  finished_at: string | null;
+  campaigns_processed: number;
+  actions_taken: number;
+  errors: number;
+  status: 'running' | 'success' | 'partial' | 'failed';
+}
+
+export interface AgentAction {
+  id: string;
+  run_id: string | null;
+  user_id: string;
+  campaign_id: string;
+  adset_id: string | null;
+  ad_id: string | null;
+  rule_id: string | null;
+  action: string;
+  reason: string | null;
+  before_metrics: Record<string, unknown> | null;
+  after_metrics: Record<string, unknown> | null;
+  dry_run: boolean;
+  status: 'pending' | 'executed' | 'failed' | 'rolled_back' | 'skipped';
+  created_at: string;
+}
+
+export interface CampaignStateRow {
+  user_id: string;
+  campaign_id: string;
+  current_mode: 'OPTIMIZE' | 'SCALE' | 'HOLD';
+  mode_entered_at: string;
+  target_cpa: number | null;
+  target_roas: number;
+  baseline_cpa: number | null;
+  baseline_roas: number | null;
+  optimization_enabled: boolean;
+  dry_run: boolean;
+  last_optimized_at: string | null;
+  last_scaled_at: string | null;
+  last_budget_change_at: string | null;
+}
+
 export const botControlService = {
   async fetchOptimizationLogs(userId?: string): Promise<OptimizationLog[]> {
     let query = supabase.from('optimization_logs').select('*');
@@ -72,7 +120,7 @@ export const botControlService = {
   },
 
   async toggleOptimization(userId: string, campaignId: string, enabled: boolean): Promise<void> {
-    const { error } = await supabase
+    const { error: e1 } = await supabase
       .from('meta_campaigns')
       .update({
         optimization_enabled: enabled,
@@ -80,7 +128,52 @@ export const botControlService = {
       })
       .eq('user_id', userId)
       .eq('campaign_id', campaignId);
+    if (e1) throw e1;
 
+    // Mirror onto campaign_states (the source of truth for the new engine).
+    const { error: e2 } = await supabase
+      .from('campaign_states')
+      .update({ optimization_enabled: enabled })
+      .eq('user_id', userId)
+      .eq('campaign_id', campaignId);
+    if (e2) throw e2;
+  },
+
+  async fetchRecentRuns(limit = 25): Promise<BotRun[]> {
+    const { data, error } = await supabase
+      .from('bot_runs')
+      .select('*')
+      .order('started_at', { ascending: false })
+      .limit(limit);
     if (error) throw error;
-  }
+    return (data ?? []) as BotRun[];
+  },
+
+  async fetchAgentActions(userId?: string, limit = 200): Promise<AgentAction[]> {
+    let q = supabase.from('agent_actions').select('*');
+    if (userId) q = q.eq('user_id', userId);
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(limit);
+    if (error) throw error;
+    return (data ?? []) as AgentAction[];
+  },
+
+  async fetchCampaignStates(userId?: string): Promise<CampaignStateRow[]> {
+    let q = supabase.from('campaign_states').select('*');
+    if (userId) q = q.eq('user_id', userId);
+    const { data, error } = await q.order('updated_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as CampaignStateRow[];
+  },
+
+  async triggerOptimizationRun(opts: {
+    mode: 'DAILY_ROUTINE' | 'OPTIMIZE_CYCLE' | 'SCALE_CHECK' | 'GUARDRAIL';
+    dryRun: boolean;
+    campaignId?: string;
+  }): Promise<{ run_id: string; processed: number; executed: number; failed: number }> {
+    const { data, error } = await supabase.functions.invoke('optimization-engine', {
+      body: { mode: opts.mode, dry_run: opts.dryRun, campaign_id: opts.campaignId },
+    });
+    if (error) throw error;
+    return data;
+  },
 };

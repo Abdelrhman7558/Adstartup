@@ -7,11 +7,18 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-const MCP_URL = 'https://mcp.pipeboard.co/meta-ads-mcp';
-const MCP_TOKEN = 'pk_52920daad0014891bb23e4612ecefdc7';
+const MCP_URL = Deno.env.get('PIPEBOARD_MCP_URL') ?? 'https://mcp.pipeboard.co/meta-ads-mcp';
+
+function getMcpToken(): string {
+    const token = Deno.env.get('PIPEBOARD_MCP_TOKEN');
+    if (!token) {
+        throw new Error('PIPEBOARD_MCP_TOKEN secret is not configured.');
+    }
+    return token;
+}
 
 async function callMcpTool(toolName: string, args: Record<string, any>) {
-    const url = `${MCP_URL}?token=${MCP_TOKEN}`;
+    const url = `${MCP_URL}?token=${getMcpToken()}`;
     const payload = {
         jsonrpc: "2.0",
         id: Date.now(),

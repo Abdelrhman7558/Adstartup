@@ -1,40 +1,91 @@
 /**
  * Manager Plan Service
- * 
- * This service handles access control for Manager plan exclusive features.
- * Manager plan users have special privileges like multiple Meta accounts.
+ *
+ * Manager / admin access is now driven by `users.role` in Supabase, not by a
+ * hardcoded email whitelist. To keep the existing call sites synchronous
+ * (`isManagerPlanUser(user?.email)`), we maintain an in-memory cache populated
+ * once after sign-in by `refreshManagerStatusForUser()` (called from
+ * AuthContext) or by the `useUserRole` hook.
+ *
+ * If the cache hasn't been populated yet for a given email, the function
+ * returns false — the consumer will re-render once the cache fills and the
+ * downstream UI rights itself. Hardcoded production emails were removed.
  */
 
-// Whitelisted emails for Manager plan
-const MANAGER_PLAN_EMAILS = [
-    'jihadalcc@gmail.com',
-    '7bd02025@gmail.com',
-] as const;
+import { supabase } from './supabase';
+
+const managerEmailCache = new Set<string>();
+const checkedEmailCache = new Set<string>();
+
+function normalize(email: string | undefined | null): string | null {
+    if (!email) return null;
+    return email.trim().toLowerCase();
+}
 
 /**
- * Check if a user has Manager plan based on their email
+ * Synchronous check used by existing UI code paths.
+ * Returns true only when `refreshManagerStatusForUser` has confirmed the role.
  */
 export function isManagerPlanUser(email: string | undefined | null): boolean {
-    if (!email) {
-        console.log('[ManagerPlan] Check failed: No email provided');
-        return false;
-    }
-    const normalizedEmail = email.trim().toLowerCase();
-    const isManager = MANAGER_PLAN_EMAILS.includes(normalizedEmail as typeof MANAGER_PLAN_EMAILS[number]);
-    console.log(`[ManagerPlan] Checking email: "${email}" (normalized: "${normalizedEmail}") -> Is Manager: ${isManager}`);
-    return isManager;
+    const normalized = normalize(email);
+    if (!normalized) return false;
+    return managerEmailCache.has(normalized);
 }
 
-/**
- * Alias for isManagerPlanUser - checks if user has Manager plan features
- */
-export function hasManagerPlanFeatures(email: string | undefined | null): boolean {
-    return isManagerPlanUser(email);
-}
+export const hasManagerPlanFeatures = isManagerPlanUser;
 
-/**
- * Get the plan name for display purposes
- */
 export function getManagerPlanName(): string {
     return 'Manager';
+}
+
+/**
+ * Populate the cache for a given user. Call this from AuthContext as soon as
+ * we know the authenticated user. Cheap network call; result is cached.
+ */
+export async function refreshManagerStatusForUser(
+    userId: string,
+    email: string | undefined | null
+): Promise<boolean> {
+    const normalized = normalize(email);
+    if (!normalized || !userId) return false;
+
+    if (checkedEmailCache.has(normalized)) {
+        return managerEmailCache.has(normalized);
+    }
+
+    const { data, error } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle();
+
+    checkedEmailCache.add(normalized);
+
+    if (error || !data) {
+        return false;
+    }
+
+    if (data.role === 'manager' || data.role === 'admin') {
+        managerEmailCache.add(normalized);
+        return true;
+    }
+
+    managerEmailCache.delete(normalized);
+    return false;
+}
+
+/**
+ * Test/admin helpers
+ */
+export function _setManagerStatus(email: string, isManager: boolean) {
+    const normalized = normalize(email);
+    if (!normalized) return;
+    if (isManager) managerEmailCache.add(normalized);
+    else managerEmailCache.delete(normalized);
+    checkedEmailCache.add(normalized);
+}
+
+export function _clearManagerCache() {
+    managerEmailCache.clear();
+    checkedEmailCache.clear();
 }
